@@ -54,6 +54,8 @@ function buildLayout() {
     { id: 'btr-roi', href: '/btr-roi.html', label: 'BTR / ROI', icon: '📈' },
     { id: 'documentos', href: '/documentos.html', label: 'Documentos', icon: '📂' },
     { id: 'mobile', href: '/mobile.html', label: 'Vista Mobile', icon: '📱' },
+    { section: 'ADMIN' },
+    { id: 'admin', href: '/admin.html', label: 'Lançar / Editar', icon: '⚙️' },
   ];
 
   let navHtml = '';
@@ -95,8 +97,8 @@ function buildLayout() {
       <div class="topbar-stat">Realizado: <strong class="text-success">${fmt.money(D.kpis.realizado)}</strong></div>
       <div class="topbar-stat">% Físico: <strong>${(D.kpis.pct_fisico*100).toFixed(1)}%</strong></div>
       <a href="https://app.clickup.com/90121749578/v/li/901211229906" target="_blank" class="topbar-btn">🎯 ClickUp</a>
-      <div class="user-chip">
-        <div class="user-avatar">EO</div>
+      <div class="user-chip" style="cursor:pointer;" onclick="if(confirm('Sair da conta?')) window.logoutBtr();" title="Clique para sair">
+        <div class="user-avatar">${(D.user && D.user.nome ? D.user.nome[0] : (D.user && D.user.email ? D.user.email[0] : 'U')).toUpperCase()}</div>
       </div>
     </div>
   </header>`;

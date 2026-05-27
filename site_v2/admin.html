@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin · Lançamentos — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css">
+<style>
+  .admin-tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 2px solid var(--gray-200); }
+  .admin-tab { padding: 10px 18px; cursor: pointer; border: none; background: none; font-weight: 500; color: var(--gray-500); border-bottom: 2px solid transparent; margin-bottom: -2px; font-family: inherit; font-size: 14px; }
+  .admin-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .form-row.full { grid-template-columns: 1fr; }
+  .form-row label { display: block; font-size: 12px; font-weight: 500; color: #374151; margin-bottom: 4px; }
+  .form-row input, .form-row select, .form-row textarea { width: 100%; padding: 9px 12px; border: 1px solid #D1D5DB; border-radius: 6px; font-size: 14px; box-sizing: border-box; font-family: inherit; }
+  .form-row textarea { min-height: 70px; resize: vertical; }
+  .form-row input:focus, .form-row select:focus, .form-row textarea:focus { outline: none; border-color: var(--primary); }
+  .btn-submit { background: var(--primary); color: white; padding: 11px 22px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px; }
+  .btn-submit:hover { background: #163a5c; }
+  .btn-submit:disabled { background: #9CA3AF; cursor: not-allowed; }
+  .btn-danger { background: var(--danger); color: white; padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .alert-ok { background: #F0FDF4; border-left: 3px solid #16A34A; padding: 10px 12px; border-radius: 6px; color: #14532D; font-size: 13px; margin-bottom: 14px; }
+  .alert-err { background: #FEF2F2; border-left: 3px solid #DC2626; padding: 10px 12px; border-radius: 6px; color: #991B1B; font-size: 13px; margin-bottom: 14px; }
+</style>
+</head>
+<body data-page="admin">
+<div id="original-content">
+<div class="page-header">
+  <div class="page-title">⚙️ Admin — Lançamentos & Edições</div>
+  <div class="page-subtitle">Criar RDOs, registrar pagamentos, editar etapas, fornecedores</div>
+</div>
+
+<div id="adminMsg"></div>
+
+<div class="admin-tabs">
+  <button class="admin-tab active" onclick="showTab('rdo')">📝 Novo RDO</button>
+  <button class="admin-tab" onclick="showTab('pagto')">💰 Novo Pagamento</button>
+  <button class="admin-tab" onclick="showTab('ocorrencia')">⚠️ Ocorrência</button>
+  <button class="admin-tab" onclick="showTab('etapa')">📋 Editar Etapa</button>
+  <button class="admin-tab" onclick="showTab('compliance')">⚖️ Compliance</button>
+</div>
+
+<!-- ============================== RDO ============================== -->
+<div class="card tab-content" id="tab-rdo">
+  <div class="card-header"><div class="card-title">📝 Novo Relatório Diário de Obra</div></div>
+  <form id="formRdo">
+    <div class="form-row">
+      <div><label>Número do RDO</label><input type="number" name="numero" step="0.01" required></div>
+      <div><label>Data</label><input type="date" name="data" required></div>
+    </div>
+    <div class="form-row">
+      <div><label>Clima manhã</label>
+        <select name="clima_manha"><option>Claro</option><option>Nublado</option><option>Chuvoso</option><option>Parcial</option></select>
+      </div>
+      <div><label>Clima tarde</label>
+        <select name="clima_tarde"><option>Claro</option><option>Nublado</option><option>Chuvoso</option><option>Parcial</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div><label>Condição</label>
+        <select name="cond_manha"><option>Praticável</option><option>Parcial</option><option>Impraticável</option></select>
+      </div>
+      <div><label>Status</label>
+        <select name="status"><option>Em Análise</option><option>Aprovado</option><option>Rascunho</option></select>
+      </div>
+    </div>
+    <div class="form-row full">
+      <div><label>Comentário do dia</label><textarea name="comentario" required></textarea></div>
+    </div>
+    <button type="submit" class="btn-submit">Salvar RDO</button>
+  </form>
+</div>
+
+<!-- ============================== PAGAMENTO ============================== -->
+<div class="card tab-content" id="tab-pagto" style="display:none;">
+  <div class="card-header"><div class="card-title">💰 Novo Pagamento / Lançamento</div></div>
+  <form id="formPagto">
+    <div class="form-row">
+      <div><label>Data do pagamento</label><input type="date" name="data" required></div>
+      <div><label>Fornecedor</label><input type="text" name="fornecedor" required placeholder="Ex: Rocha Materiais"></div>
+    </div>
+    <div class="form-row">
+      <div><label>Valor (R$)</label><input type="number" name="valor" step="0.01" required></div>
+      <div><label>Categoria</label>
+        <select name="categoria"><option>Material</option><option>Mão de Obra</option><option>Serviço</option><option>Aquisição</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div><label>Etapa</label>
+        <select name="etapa_cod" id="selEtapa" required></select>
+      </div>
+      <div><label>RDO vinculado (opcional)</label><input type="number" name="rdo_numero" step="0.01" placeholder="Ex: 4"></div>
+    </div>
+    <div class="form-row full">
+      <div><label>Descrição</label><textarea name="descricao" required placeholder="Ex: PIX Rocha Materiais — colunas p/ fundação"></textarea></div>
+    </div>
+    <div class="form-row">
+      <div><label>Tipo lançamento</label>
+        <select name="tipo_lanc"><option value="material">Material</option><option value="mo">Mão de Obra</option></select>
+      </div>
+      <div><label>Status pagamento</label>
+        <select name="status_pagamento"><option>Pago</option><option>A Pagar</option><option>Atrasado</option></select>
+      </div>
+    </div>
+    <button type="submit" class="btn-submit">Salvar pagamento + criar atividade</button>
+  </form>
+</div>
+
+<!-- ============================== OCORRÊNCIA ============================== -->
+<div class="card tab-content" id="tab-ocorrencia" style="display:none;">
+  <div class="card-header"><div class="card-title">⚠️ Nova Ocorrência / Risco</div></div>
+  <form id="formOcorrencia">
+    <div class="form-row">
+      <div><label>Data</label><input type="date" name="data" required></div>
+      <div><label>Tipo</label>
+        <select name="tipo"><option>Atraso</option><option>Acidente</option><option>Risco Técnico</option><option>Estouro Orçamento</option><option>Outro</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div><label>Severidade</label>
+        <select name="severidade"><option>Baixa</option><option>Média</option><option>Alta</option><option>Crítica</option></select>
+      </div>
+      <div><label>Status</label>
+        <select name="status"><option>Aberto</option><option>Em Tratamento</option><option>Mitigado</option><option>Finalizado</option></select>
+      </div>
+    </div>
+    <div class="form-row full">
+      <div><label>Descrição</label><textarea name="descricao" required></textarea></div>
+    </div>
+    <div class="form-row">
+      <div><label>Profissional envolvido (opcional)</label><input type="text" name="profissional"></div>
+      <div><label>Ação de mitigação (opcional)</label><input type="text" name="acao_mitigacao"></div>
+    </div>
+    <button type="submit" class="btn-submit">Registrar ocorrência</button>
+  </form>
+</div>
+
+<!-- ============================== EDITAR ETAPA ============================== -->
+<div class="card tab-content" id="tab-etapa" style="display:none;">
+  <div class="card-header"><div class="card-title">📋 Editar Etapa (orçado / status)</div></div>
+  <form id="formEtapa">
+    <div class="form-row">
+      <div><label>Etapa</label><select name="cod" id="selEtapaEdit" required></select></div>
+      <div><label>Status</label>
+        <select name="status"><option>No prazo</option><option>Em andamento</option><option>⚠ Estouro</option><option>Concluída</option><option>Atrasada</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div><label>Orçado (R$)</label><input type="number" name="orcado" step="0.01"></div>
+      <div><label>Curva ABC</label>
+        <select name="abc"><option value="">—</option><option>A</option><option>B</option><option>C</option></select>
+      </div>
+    </div>
+    <div class="form-row full">
+      <div><label>Descrição</label><textarea name="descricao"></textarea></div>
+    </div>
+    <button type="submit" class="btn-submit">Atualizar etapa</button>
+  </form>
+</div>
+
+<!-- ============================== COMPLIANCE ============================== -->
+<div class="card tab-content" id="tab-compliance" style="display:none;">
+  <div class="card-header"><div class="card-title">⚖️ Atualizar Compliance</div></div>
+  <div class="text-xs text-muted" style="margin-bottom:14px;">Marque os itens conforme você for resolvendo. Lista carregada do banco.</div>
+  <div id="compList"></div>
+</div>
+
+</div>
+
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js"></script>
+<script>
+function initPage() {
+  const sb = window.supabase;
+  const D = window.DATA;
+  const msg = document.getElementById('adminMsg');
+
+  // Permissões: só dono e engenheiro podem editar etapas; mestre/engenheiro pode criar RDO
+  const papel = D.user.papel || 'leitor';
+  if (papel === 'leitor') {
+    document.querySelector('#original-content').innerHTML = '<div class="alert alert-warning"><div class="alert-icon">🔒</div><div class="alert-body"><div class="alert-title">Acesso negado</div>Você está como leitor. Peça ao admin para alterar seu papel.</div></div>';
+    return;
+  }
+
+  // Popular dropdown de etapas
+  const todasEtapas = [...D.etapas_nbr, ...D.itens_fora];
+  if (D.terreno) todasEtapas.push(D.terreno);
+  const opts = todasEtapas.map(e => `<option value="${e.cod}">${e.cod} — ${e.nome}</option>`).join('');
+  document.getElementById('selEtapa').innerHTML = opts;
+  document.getElementById('selEtapaEdit').innerHTML = opts;
+
+  // Pré-preencher data com hoje
+  const today = new Date().toISOString().substring(0,10);
+  document.querySelectorAll('input[type=date]').forEach(i => i.value = today);
+
+  // Submit RDO
+  document.getElementById('formRdo').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const payload = {
+      numero: Number(f.get('numero')),
+      data: f.get('data'),
+      clima_manha: f.get('clima_manha'),
+      clima_tarde: f.get('clima_tarde'),
+      cond_manha: f.get('cond_manha'),
+      cond_tarde: f.get('cond_manha'),
+      status: f.get('status'),
+      comentario: f.get('comentario'),
+      criado_por: D.user.nome || D.user.email || 'Admin',
+      dia_semana: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(f.get('data')).getDay()]
+    };
+    const { error } = await sb.from('rdos').insert(payload);
+    showMsg(error, 'RDO salvo!', e.target);
+  };
+
+  // Submit Pagamento (cria fornecedor + atividade)
+  document.getElementById('formPagto').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const cod = f.get('etapa_cod');
+    const etapa = todasEtapas.find(x => x.cod === cod);
+    const valor = Number(f.get('valor'));
+    const tipoLanc = f.get('tipo_lanc');
+
+    // 1. Insere fornecedor (registro de pagamento)
+    const { error: e1 } = await sb.from('fornecedores').insert({
+      nome: f.get('fornecedor'),
+      data: f.get('data'),
+      valor,
+      descricao: f.get('descricao'),
+      categoria: f.get('categoria'),
+      status_pagamento: f.get('status_pagamento'),
+      etapa_ref: `${cod} - ${etapa.nome}`
+    });
+    if (e1) return showMsg(e1, null, e.target);
+
+    // 2. Insere atividade no log (alimenta KPIs)
+    const { error: e2 } = await sb.from('atividades').insert({
+      rdo_numero: f.get('rdo_numero') ? Number(f.get('rdo_numero')) : null,
+      data: f.get('data'),
+      etapa_cod: cod,
+      etapa_nome: etapa.nome,
+      status: 'A Iniciar',
+      descricao: f.get('descricao'),
+      pct: 0,
+      mao_obra: tipoLanc === 'mo' ? valor : 0,
+      material: tipoLanc === 'material' ? valor : 0,
+      total: valor
+    });
+    showMsg(e2, `Pagamento de R$ ${valor.toLocaleString('pt-BR')} registrado em ${cod}!`, e.target);
+  };
+
+  // Submit Ocorrência
+  document.getElementById('formOcorrencia').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const payload = Object.fromEntries(f.entries());
+    const { error } = await sb.from('ocorrencias').insert(payload);
+    showMsg(error, 'Ocorrência registrada!', e.target);
+  };
+
+  // Submit Editar Etapa
+  document.getElementById('formEtapa').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const cod = f.get('cod');
+    const updates = {};
+    if (f.get('status')) updates.status = f.get('status');
+    if (f.get('orcado')) updates.orcado = Number(f.get('orcado'));
+    if (f.get('abc')) updates.abc = f.get('abc');
+    if (f.get('descricao')) updates.descricao = f.get('descricao');
+    const { error } = await sb.from('etapas').update(updates).eq('cod', cod);
+    showMsg(error, `Etapa ${cod} atualizada!`, null);
+  };
+
+  // Lista compliance interativa
+  async function reloadCompliance() {
+    const { data } = await sb.from('compliance').select('*').order('id');
+    document.getElementById('compList').innerHTML = data.map(c => `
+      <div style="padding:10px; border-bottom: 1px solid var(--gray-200); display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;">
+        <div>
+          <strong>${c.item}</strong><br>
+          <span class="text-xs text-muted">${c.categoria} · ${c.base_legal || ''}</span>
+        </div>
+        <select onchange="updateCompliance(${c.id}, this.value)" style="padding:6px 10px; border-radius:4px; border:1px solid #D1D5DB;">
+          <option ${c.status==='Pendente'?'selected':''}>Pendente</option>
+          <option ${c.status==='Em andamento'?'selected':''}>Em andamento</option>
+          <option ${c.status==='Concluído'?'selected':''}>Concluído</option>
+          <option ${c.status==='N/A'?'selected':''}>N/A</option>
+        </select>
+        <input type="text" value="${c.responsavel || ''}" placeholder="Responsável" onblur="updateComplianceResp(${c.id}, this.value)" style="padding:6px 10px; border-radius:4px; border:1px solid #D1D5DB; width:140px;">
+      </div>
+    `).join('');
+  }
+  reloadCompliance();
+
+  window.updateCompliance = async (id, status) => {
+    await sb.from('compliance').update({ status }).eq('id', id);
+    showMsg(null, 'Status atualizado', null);
+  };
+  window.updateComplianceResp = async (id, responsavel) => {
+    await sb.from('compliance').update({ responsavel }).eq('id', id);
+  };
+
+  function showMsg(error, successMsg, formToReset) {
+    if (error) {
+      msg.innerHTML = `<div class="alert-err">❌ ${error.message}</div>`;
+    } else {
+      msg.innerHTML = `<div class="alert-ok">✅ ${successMsg}</div>`;
+      if (formToReset) {
+        formToReset.reset();
+        formToReset.querySelectorAll('input[type=date]').forEach(i => i.value = today);
+      }
+    }
+    setTimeout(() => msg.innerHTML = '', 4000);
+  }
+}
+
+window.showTab = (id) => {
+  document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.admin-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + id).style.display = 'block';
+  event.target.classList.add('active');
+};
+</script>
+</body>
+</html>
