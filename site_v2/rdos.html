@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RDOs — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="rdos">
+<div id="original-content">
+<div class="page-header">
+  <div class="page-title">📝 RDOs · Relatórios Diários de Obra</div>
+  <div class="page-subtitle">Linha do tempo de todos os RDOs · sincronizado com mais.ControleERP</div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-label">RDOs Registrados</div><div class="kpi-value" id="rTotal">—</div></div>
+  <div class="kpi success"><div class="kpi-label">Aprovados</div><div class="kpi-value" id="rApr">—</div></div>
+  <div class="kpi warning"><div class="kpi-label">Em Análise/Rascunho</div><div class="kpi-value" id="rPend">—</div></div>
+  <div class="kpi"><div class="kpi-label">Último Registro</div><div class="kpi-value" id="rLast" style="font-size:18px;">—</div><div class="kpi-delta" id="rLastDelta">—</div></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><div class="card-title">⏰ Timeline</div><div class="card-meta">ordenado por data ↓</div></div>
+    <div class="timeline" id="rdoTl"></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">📋 Detalhes do RDO</div><div class="card-meta" id="detTitle">— selecione um RDO</div></div>
+    <div id="rdoDetail" class="text-muted text-small">Clique em um RDO da timeline ao lado para ver detalhes.</div>
+  </div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>function initPage() { const D = window.DATA; 
+  document.getElementById('rTotal').textContent = D.rdos.length;
+  document.getElementById('rApr').textContent = D.rdos.filter(r => r.status === 'Aprovado').length;
+  document.getElementById('rPend').textContent = D.rdos.filter(r => r.status !== 'Aprovado').length;
+  const ult = [...D.rdos].sort((a,b) => a.data > b.data ? -1 : 1)[0];
+  if (ult) {
+    document.getElementById('rLast').textContent = 'RDO #' + ult.numero;
+    document.getElementById('rLastDelta').textContent = fmt.date(ult.data);
+  }
+
+  const sortedRdos = [...D.rdos].sort((a,b) => a.data > b.data ? -1 : 1);
+  document.getElementById('rdoTl').innerHTML = sortedRdos.map(r => {
+    const cls = r.status === 'Aprovado' ? 'success' : (r.status === 'Recusado' ? 'danger' : '');
+    return `<div class="timeline-item ${cls}" onclick="showRdo(${r.numero})" style="cursor:pointer;">
+      <div class="timeline-date">RDO #${r.numero} · ${fmt.date(r.data)} ${r.dia_semana || ''}</div>
+      <div class="timeline-title">${statusBadge(r.status)} ${r.criado_por || ''}</div>
+      <div class="timeline-desc">${r.comentario ? r.comentario.substring(0, 150) + (r.comentario.length > 150 ? '...' : '') : '—'}</div>
+    </div>`;
+  }).join('');
+
+  window.showRdo = (n) => {
+    const r = D.rdos.find(x => x.numero === n);
+    if (!r) return;
+    document.getElementById('detTitle').textContent = `RDO #${r.numero} · ${fmt.date(r.data)}`;
+    const atvs = D.atividades_log.filter(a => a.rdo === n);
+    const mos = D.mao_obra_log.filter(m => m.rdo === n);
+    const ocs = D.ocorrencias.filter(o => o.rdo === n);
+    document.getElementById('rdoDetail').innerHTML = `
+      <div style="margin-bottom:14px;">
+        <div class="text-xs text-muted">STATUS</div>
+        <div>${statusBadge(r.status)}</div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <div class="text-xs text-muted">CLIMA</div>
+        <div class="text-small">Manhã: ${r.clima_manha || '—'} (${r.cond_manha || '—'}) · Tarde: ${r.clima_tarde || '—'} (${r.cond_tarde || '—'})</div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <div class="text-xs text-muted">COMENTÁRIO</div>
+        <div class="text-small">${r.comentario || '—'}</div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <div class="text-xs text-muted">ATIVIDADES (${atvs.length})</div>
+        ${atvs.length ? atvs.map(a => `<div style="padding:8px; background:var(--gray-50); border-radius:6px; margin-top:6px; font-size:12px;">
+          <strong>${a.cod}</strong> ${a.etapa || ''} ${statusBadge(a.status)}<br>
+          <span class="text-muted">${a.descricao || ''}</span><br>
+          MO ${fmt.money(a.mo)} · Mat ${fmt.money(a.material)} = <strong>${fmt.money(a.total)}</strong>
+        </div>`).join('') : '<div class="text-muted text-xs">Nenhuma</div>'}
+      </div>
+      <div style="margin-bottom:14px;">
+        <div class="text-xs text-muted">MÃO DE OBRA (${mos.length})</div>
+        ${mos.length ? mos.map(m => `<div class="text-small">• ${m.qtd}× ${m.funcao}: ${m.profissional}</div>`).join('') : '<div class="text-muted text-xs">Nenhum registro</div>'}
+      </div>
+      ${ocs.length ? `<div style="margin-bottom:14px;">
+        <div class="text-xs text-muted">OCORRÊNCIAS</div>
+        ${ocs.map(o => `<div class="alert alert-danger text-small" style="margin-top:6px;">
+          <div class="alert-body"><strong>${o.tipo}</strong> ${severidadeBadge(o.severidade)}<br>${o.descricao}</div></div>`).join('')}
+      </div>` : ''}
+    `;
+  };
+
+  // Open last RDO by default
+  if (sortedRdos.length) showRdo(sortedRdos[0].numero);
+ }</script>
+</body>
+</html>

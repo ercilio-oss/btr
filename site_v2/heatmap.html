@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Heatmap — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="heatmap">
+<div id="original-content">
+<style>
+.heat-grid { display: grid; grid-template-columns: 80px repeat(7, 1fr); gap: 3px; font-size: 11px; }
+.heat-cell { aspect-ratio: 1; border-radius: 3px; position: relative; cursor: pointer; transition: transform 0.1s; }
+.heat-cell:hover { transform: scale(1.4); z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+.heat-cell.h0 { background: var(--gray-100); }
+.heat-cell.h1 { background: #DCFCE7; }
+.heat-cell.h2 { background: #86EFAC; }
+.heat-cell.h3 { background: #4ADE80; }
+.heat-cell.h4 { background: #16A34A; }
+.heat-cell.h5 { background: #15803D; }
+.heat-label { color: var(--text-muted); text-align: right; padding-right: 6px; font-size: 10px; }
+.heat-week { color: var(--text-muted); text-align: center; padding: 4px 0; font-weight: 600; }
+.heat-tooltip { background: white; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; box-shadow: var(--shadow); font-size: 12px; position: absolute; pointer-events: none; z-index: 100; display: none; min-width: 200px; }
+.legend { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); margin-top: 12px; }
+.legend-cell { width: 14px; height: 14px; border-radius: 3px; }
+</style>
+<div class="page-header">
+  <div class="page-title">🔥 Heatmap de Gastos</div>
+  <div class="page-subtitle">Intensidade de gastos por dia · identifica picos e padrões de compra</div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-label">Dias com gasto</div><div class="kpi-value" id="hmDias">—</div></div>
+  <div class="kpi success"><div class="kpi-label">Dia mais gasto</div><div class="kpi-value" id="hmTop">—</div><div class="kpi-delta" id="hmTopDelta">—</div></div>
+  <div class="kpi warning"><div class="kpi-label">Média/dia</div><div class="kpi-value" id="hmMedia">—</div></div>
+  <div class="kpi"><div class="kpi-label">Dia da semana preferido</div><div class="kpi-value" id="hmDsem" style="font-size:18px;">—</div></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">📅 Heatmap (clique em um dia para detalhes)</div></div>
+  <div id="heatmapView"></div>
+  <div class="legend">
+    Menos &nbsp;
+    <div class="legend-cell h0"></div>
+    <div class="legend-cell h1"></div>
+    <div class="legend-cell h2"></div>
+    <div class="legend-cell h3"></div>
+    <div class="legend-cell h4"></div>
+    <div class="legend-cell h5"></div>
+    &nbsp; Mais
+  </div>
+  <div id="heatDetail" class="alert alert-info" style="margin-top:16px; display:none;"></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">📊 Distribuição por Dia da Semana</div></div>
+  <div class="chart-wrap"><canvas id="chartDayWeek"></canvas></div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>function initPage() { const D = window.DATA; 
+  // Agrupar gastos por data
+  const porData = {};
+  D.atividades_log.forEach(a => {
+    porData[a.data] = (porData[a.data] || 0) + a.total;
+  });
+
+  const datas = Object.keys(porData).sort();
+  const valores = Object.values(porData);
+  const total = valores.reduce((s,v) => s+v, 0);
+  const max = Math.max(...valores);
+  const media = total / datas.length;
+
+  // Top dia
+  let topDia = null, topVal = 0;
+  for (const [d, v] of Object.entries(porData)) {
+    if (v > topVal) { topVal = v; topDia = d; }
+  }
+  document.getElementById('hmDias').textContent = datas.length;
+  document.getElementById('hmTop').textContent = fmt.money(topVal);
+  document.getElementById('hmTopDelta').textContent = topDia ? new Date(topDia).toLocaleDateString('pt-BR') : '—';
+  document.getElementById('hmMedia').textContent = fmt.money(media);
+
+  // Dia da semana
+  const dsem = [0,0,0,0,0,0,0];
+  const dsemNomes = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  for (const [d, v] of Object.entries(porData)) {
+    const dia = new Date(d).getDay();
+    dsem[dia] += v;
+  }
+  const idxMax = dsem.indexOf(Math.max(...dsem));
+  document.getElementById('hmDsem').textContent = dsemNomes[idxMax];
+
+  function intensity(v) {
+    if (v === 0) return 'h0';
+    const ratio = v / max;
+    if (ratio <= 0.2) return 'h1';
+    if (ratio <= 0.4) return 'h2';
+    if (ratio <= 0.6) return 'h3';
+    if (ratio <= 0.8) return 'h4';
+    return 'h5';
+  }
+
+  // Render heatmap — 6 meses (Fev a Out 2026)
+  const meses = [
+    {label: 'Fev/26', y:2026, m:1}, {label: 'Mar/26', y:2026, m:2}, {label: 'Abr/26', y:2026, m:3},
+    {label: 'Mai/26', y:2026, m:4}, {label: 'Jun/26', y:2026, m:5}, {label: 'Jul/26', y:2026, m:6},
+    {label: 'Ago/26', y:2026, m:7}, {label: 'Set/26', y:2026, m:8}, {label: 'Out/26', y:2026, m:9},
+  ];
+
+  let html = '';
+  meses.forEach(mes => {
+    const first = new Date(mes.y, mes.m, 1);
+    const last = new Date(mes.y, mes.m + 1, 0);
+    html += `<h4 style="margin-top:20px; color:var(--text-muted); font-size:12px; font-weight:600;">${mes.label}</h4>`;
+    html += `<div class="heat-grid">`;
+    html += `<div></div>` + ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d => `<div class="heat-week">${d}</div>`).join('');
+
+    let curRow = '<div class="heat-label">Sem ' + Math.ceil(first.getDate()/7) + '</div>';
+    let dayOfWeek = first.getDay();
+    for (let i = 0; i < dayOfWeek; i++) curRow += '<div></div>';
+    let curRowDays = dayOfWeek;
+
+    for (let d = 1; d <= last.getDate(); d++) {
+      const dt = new Date(mes.y, mes.m, d);
+      const dtStr = dt.toISOString().split('T')[0];
+      const v = porData[dtStr] || 0;
+      curRow += `<div class="heat-cell ${intensity(v)}" data-date="${dtStr}" data-val="${v}" title="${dtStr}: ${fmt.money(v)}" onclick="showHeat('${dtStr}', ${v})"></div>`;
+      curRowDays++;
+      if (curRowDays === 7) {
+        html += curRow + '</div><div class="heat-grid">';
+        curRow = '<div class="heat-label">Sem ' + (Math.ceil(d/7)+1) + '</div>';
+        curRowDays = 0;
+      }
+    }
+    while (curRowDays > 0 && curRowDays < 7) { curRow += '<div></div>'; curRowDays++; }
+    html += curRow + '</div>';
+  });
+
+  document.getElementById('heatmapView').innerHTML = html;
+
+  window.showHeat = (date, val) => {
+    const det = document.getElementById('heatDetail');
+    if (val === 0) {
+      det.innerHTML = `<div class="alert-body"><strong>${new Date(date).toLocaleDateString('pt-BR')}</strong>: nenhum gasto</div>`;
+    } else {
+      const items = D.atividades_log.filter(a => a.data === date);
+      det.innerHTML = `<div class="alert-body">
+        <strong>${new Date(date).toLocaleDateString('pt-BR')}</strong> · Total: <strong>${fmt.money(val)}</strong><br>
+        <ul style="margin-top:6px; padding-left:18px; font-size:12px;">
+          ${items.map(i => `<li>${i.cod} ${i.etapa || ''} — MO ${fmt.money(i.mo)} + Mat ${fmt.money(i.material)}</li>`).join('')}
+        </ul>
+      </div>`;
+    }
+    det.style.display = 'flex';
+  };
+
+  // Chart por dia da semana
+  new Chart(document.getElementById('chartDayWeek'), {
+    type: 'bar', data: { labels: dsemNomes,
+      datasets: [{ data: dsem, backgroundColor: dsem.map((v,i) => i === idxMax ? '#16A34A' : '#1F4E78') }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }},
+      scales: { y: { beginAtZero: true, ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' }}}}
+  });
+ }</script>
+</body>
+</html>

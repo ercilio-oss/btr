@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cash Flow — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="cash-flow">
+<div id="original-content">
+<div class="page-header">
+  <div class="page-title">📊 Cash Flow Projetado</div>
+  <div class="page-subtitle">Saída de caixa prevista vs realizada · projeção semanal até a entrega</div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-label">Saldo Inicial (estimado)</div><div class="kpi-value" id="cfSaldoIni">R$ 100.000</div><div class="kpi-delta" id="cfSaldoIniHint">edite ao lado ↓</div></div>
+  <div class="kpi success"><div class="kpi-label">Já Desembolsado</div><div class="kpi-value" id="cfDesemb">—</div></div>
+  <div class="kpi warning"><div class="kpi-label">A Desembolsar</div><div class="kpi-value" id="cfADesemb">—</div></div>
+  <div class="kpi danger"><div class="kpi-label">Saldo Final Estimado</div><div class="kpi-value" id="cfFinal">—</div></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">⚙️ Premissas (ajuste para simular cenários)</div></div>
+  <div class="grid-3">
+    <div>
+      <label class="text-xs text-muted">Saldo Inicial Disponível (R$)</label>
+      <input type="number" id="inpSaldo" class="input" value="100000" oninput="saveCF(); recalcCF();" style="width:100%;">
+    </div>
+    <div>
+      <label class="text-xs text-muted">Aportes Mensais Adicionais (R$)</label>
+      <input type="number" id="inpAporte" class="input" value="0" oninput="saveCF(); recalcCF();" style="width:100%;">
+    </div>
+    <div>
+      <label class="text-xs text-muted">Cenário de Velocidade de Gasto</label>
+      <select id="inpCenario" class="select" oninput="saveCF(); recalcCF();" style="width:100%;">
+        <option value="prev">Conforme Curva S Prevista</option>
+        <option value="real">Velocidade Atual (mais rápido)</option>
+        <option value="lento">25% mais lento</option>
+      </select>
+    </div>
+  </div>
+  <div class="text-xs text-muted" style="margin-top:8px;">💾 Valores salvos automaticamente neste navegador. <button onclick="resetCF()" class="btn btn-link" style="padding:0;color:var(--primary);background:none;border:none;cursor:pointer;text-decoration:underline;">Restaurar padrão</button></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">📈 Evolução do Saldo de Caixa</div></div>
+  <div class="chart-wrap lg"><canvas id="chartCash"></canvas></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">⚠️ Alerta de Liquidez</div></div>
+  <div id="alertaLiq"></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">📋 Detalhe Mensal</div></div>
+  <div class="table-wrap">
+    <table id="cfTable">
+      <thead><tr>
+        <th>Mês</th><th class="num">Saídas Previstas</th><th class="num">Aportes</th>
+        <th class="num">Variação</th><th class="num">Saldo</th><th>Status</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>function initPage() { const D = window.DATA;
+  document.getElementById('cfDesemb').textContent = fmt.money(D.kpis.realizado);
+  document.getElementById('cfADesemb').textContent = fmt.money(D.kpis.saldo);
+
+  // ============================================================
+  // PERSISTÊNCIA (localStorage neste navegador)
+  // ============================================================
+  const CF_KEY = 'btr_paraiso_ii_cashflow_v1';
+  window.saveCF = () => {
+    const state = {
+      saldoIni: Number(document.getElementById('inpSaldo').value) || 0,
+      aporte: Number(document.getElementById('inpAporte').value) || 0,
+      cenario: document.getElementById('inpCenario').value
+    };
+    try { localStorage.setItem(CF_KEY, JSON.stringify(state)); } catch(e) {}
+  };
+  window.loadCF = () => {
+    try {
+      const raw = localStorage.getItem(CF_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (s.saldoIni !== undefined) document.getElementById('inpSaldo').value = s.saldoIni;
+      if (s.aporte !== undefined) document.getElementById('inpAporte').value = s.aporte;
+      if (s.cenario) document.getElementById('inpCenario').value = s.cenario;
+    } catch(e) {}
+  };
+  window.resetCF = () => {
+    try { localStorage.removeItem(CF_KEY); } catch(e) {}
+    document.getElementById('inpSaldo').value = 100000;
+    document.getElementById('inpAporte').value = 0;
+    document.getElementById('inpCenario').value = 'prev';
+    window.recalcCF();
+  };
+
+  // Carrega valores salvos antes do primeiro render
+  window.loadCF();
+
+  window.recalcCF = () => {
+    const saldoIni = Number(document.getElementById('inpSaldo').value) || 0;
+    const aporte = Number(document.getElementById('inpAporte').value) || 0;
+    const cenario = document.getElementById('inpCenario').value;
+    // Atualiza KPI card de Saldo Inicial
+    document.getElementById('cfSaldoIni').textContent = fmt.money(saldoIni);
+    document.getElementById('cfSaldoIniHint').textContent = aporte > 0
+      ? `+ ${fmt.money(aporte)}/mês de aporte`
+      : 'edite ao lado ↓';
+
+    const cron = D.cronograma_mensal;
+    const mult = cenario === 'real' ? 1.2 : (cenario === 'lento' ? 0.75 : 1.0);
+
+    let saldo = saldoIni;
+    const linhas = cron.map(m => {
+      const desemb = m.desemb_prev * mult;
+      const var_ = aporte - desemb;
+      saldo += var_;
+      return { mes: m.mes, desemb, aporte, var: var_, saldo, status: saldo < 0 ? 'negativo' : (saldo < 10000 ? 'baixo' : 'ok') };
+    });
+
+    // Update final
+    document.getElementById('cfFinal').textContent = fmt.money(linhas[linhas.length-1].saldo);
+    document.getElementById('cfFinal').style.color = linhas[linhas.length-1].saldo < 0 ? 'var(--danger)' : 'var(--text)';
+
+    // Chart
+    if (window.cashChart) window.cashChart.destroy();
+    window.cashChart = new Chart(document.getElementById('chartCash'), {
+      type: 'line',
+      data: { labels: linhas.map(l => l.mes),
+        datasets: [
+          { label: 'Saldo projetado', data: linhas.map(l => l.saldo),
+            borderColor: '#1F4E78', borderWidth: 3, tension: 0.3,
+            backgroundColor: linhas.map(l => l.saldo < 0 ? 'rgba(220,38,38,0.2)' : 'rgba(31,78,120,0.1)'),
+            fill: true, pointRadius: 6, pointBackgroundColor: linhas.map(l => l.saldo < 0 ? '#DC2626' : '#1F4E78') },
+          { label: 'Linha do zero', data: linhas.map(() => 0),
+            borderColor: '#DC2626', borderWidth: 1, borderDash: [5,5], pointRadius: 0, fill: false }
+        ] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' }},
+        scales: { y: { ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' }}}}
+    });
+
+    // Alerta
+    const zero = linhas.find(l => l.saldo < 0);
+    const baixo = linhas.find(l => l.saldo > 0 && l.saldo < 15000);
+    let alertHtml = '';
+    if (zero) {
+      alertHtml = `<div class="alert alert-danger"><div class="alert-icon">🔴</div><div class="alert-body">
+        <div class="alert-title">CAIXA VAI ZERAR EM ${zero.mes}</div>
+        Saldo previsto: ${fmt.money(zero.saldo)}. Antecipe aporte ou negocie prazos com fornecedores.
+      </div></div>`;
+    } else if (baixo) {
+      alertHtml = `<div class="alert alert-warning"><div class="alert-icon">⚠️</div><div class="alert-body">
+        <div class="alert-title">Saldo crítico em ${baixo.mes}</div>
+        Saldo previsto: ${fmt.money(baixo.saldo)}. Reserva mínima recomendada: R$ 15k para imprevistos.
+      </div></div>`;
+    } else {
+      alertHtml = `<div class="alert alert-success"><div class="alert-icon">✅</div><div class="alert-body">
+        <div class="alert-title">Liquidez OK</div>
+        Saldo se mantém positivo durante toda a obra. Saldo final estimado: ${fmt.money(linhas[linhas.length-1].saldo)}.
+      </div></div>`;
+    }
+    document.getElementById('alertaLiq').innerHTML = alertHtml;
+
+    // Tabela
+    document.querySelector('#cfTable tbody').innerHTML = linhas.map(l => {
+      const cls = l.status === 'negativo' ? 'badge-red' : l.status === 'baixo' ? 'badge-yellow' : 'badge-green';
+      const lbl = l.status === 'negativo' ? 'NEGATIVO' : l.status === 'baixo' ? 'BAIXO' : 'OK';
+      return `<tr>
+        <td><strong>${l.mes}</strong></td>
+        <td class="num text-danger">${fmt.money(l.desemb)}</td>
+        <td class="num text-success">${fmt.money(l.aporte)}</td>
+        <td class="num ${l.var < 0 ? 'text-danger' : 'text-success'}">${l.var > 0 ? '+' : ''}${fmt.money(l.var)}</td>
+        <td class="num text-bold" style="color:${l.saldo < 0 ? 'var(--danger)' : 'var(--text)'}">${fmt.money(l.saldo)}</td>
+        <td><span class="badge ${cls}">${lbl}</span></td>
+      </tr>`;
+    }).join('');
+  };
+  window.recalcCF();
+ }</script>
+</body>
+</html>

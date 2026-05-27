@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apropriação — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="apropriacao">
+<div id="original-content">
+<div class="page-header">
+  <div class="page-title">📋 Apropriação</div>
+  <div class="page-subtitle">Etapas NBR + Itens Fora do Escopo · Orçado vs Realizado por etapa</div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-label">Orçado Total</div><div class="kpi-value" id="apOrc">—</div></div>
+  <div class="kpi success"><div class="kpi-label">Realizado</div><div class="kpi-value" id="apReal">—</div></div>
+  <div class="kpi warning"><div class="kpi-label">Saldo</div><div class="kpi-value" id="apSaldo">—</div></div>
+  <div class="kpi danger"><div class="kpi-label">Em Estouro</div><div class="kpi-value" id="apEst">—</div></div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">Detalhamento por Etapa</div>
+    <div class="card-meta" id="apTotalRows">—</div>
+  </div>
+  <div class="filters">
+    <select id="fEtapa" class="select" onchange="renderApr()">
+      <option value="todas">Todas as etapas</option>
+      <option value="nbr">Apenas NBR (20)</option>
+      <option value="fora">Apenas Itens Fora (7)</option>
+    </select>
+    <label class="checkbox-label">
+      <input type="checkbox" id="fAtivos" checked onchange="renderApr()">
+      Esconder zerados
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="fEstouro" onchange="renderApr()">
+      Apenas estouros
+    </label>
+    <input type="text" id="fBusca" class="input" placeholder="Buscar..." oninput="renderApr()" style="margin-left:auto;">
+  </div>
+
+  <div class="appropriation-row header">
+    <div>CÓD</div><div>ETAPA</div><div class="num">PREVISTO</div>
+    <div class="num">REALIZADO</div><div class="num">SALDO</div><div>% EXECUÇÃO</div>
+  </div>
+  <div id="aprList"></div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>
+function initPage() {
+  const D = window.DATA;
+
+  document.getElementById('apOrc').textContent = fmt.money(D.kpis.orcamento_total);
+  document.getElementById('apReal').textContent = fmt.money(D.kpis.realizado);
+  document.getElementById('apSaldo').textContent = fmt.money(D.kpis.saldo);
+  document.getElementById('apEst').textContent = D.aggregations.n_estouro;
+
+  window.renderApr = () => {
+    const f = document.getElementById('fEtapa').value;
+    const semZero = document.getElementById('fAtivos').checked;
+    const soEst = document.getElementById('fEstouro').checked;
+    const busca = (document.getElementById('fBusca').value || '').toLowerCase();
+    let list = [];
+    if (f === 'todas' || f === 'nbr') list = list.concat(D.etapas_nbr);
+    if (f === 'todas' || f === 'fora') list = list.concat(D.itens_fora);
+    list = list.filter(e => {
+      if (semZero && e.orcado === 0 && e.realizado === 0) return false;
+      if (soEst && (e.pct || 0) <= 1) return false;
+      if (busca && !(e.cod + ' ' + e.nome + ' ' + (e.desc||'')).toLowerCase().includes(busca)) return false;
+      return true;
+    });
+    document.getElementById('apTotalRows').textContent = list.length + ' etapas';
+    document.getElementById('aprList').innerHTML = list.map(e => {
+      const pct = e.pct || 0;
+      const cls = pct > 1 ? 'danger' : (pct > 0.8 ? 'warning' : '');
+      return `<div class="appropriation-row">
+        <div><span class="cod-cell">${e.cod}</span></div>
+        <div class="name">${e.nome}<div class="desc">${e.desc || ''}</div></div>
+        <div class="num">${fmt.money(e.orcado)}</div>
+        <div class="num text-bold">${fmt.money(e.realizado)}</div>
+        <div class="num ${(e.saldo||0) < 0 ? 'text-danger text-bold' : 'text-muted'}">${fmt.money(e.saldo)}</div>
+        <div class="progress-bar-row"><div class="fill ${cls}" style="width:${Math.min(pct*100, 100)}%"></div><div class="pct">${(pct*100).toFixed(1)}%</div></div>
+      </div>`;
+    }).join('');
+  };
+  renderApr();
+
+}
+</script>
+</body>
+</html>

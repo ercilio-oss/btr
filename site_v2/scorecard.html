@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Score Card — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="scorecard">
+<div id="original-content">
+<style>
+.scorecard { background: white; border-radius: 14px; padding: 32px; box-shadow: var(--shadow); }
+.score-header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom: 20px; border-bottom: 2px solid var(--primary); margin-bottom: 24px; }
+.score-header h1 { font-size: 26px; color: var(--primary); }
+.score-header .meta { text-align: right; font-size: 12px; color: var(--text-muted); }
+.score-section { margin-bottom: 24px; }
+.score-section-title { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; }
+.score-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+.score-card { background: var(--gray-50); border-radius: 10px; padding: 16px; border-left: 4px solid; }
+.score-card.green { border-left-color: var(--success); }
+.score-card.yellow { border-left-color: var(--warning); }
+.score-card.red { border-left-color: var(--danger); }
+.score-card .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.score-card .value { font-size: 24px; font-weight: 700; margin-top: 4px; line-height: 1; }
+.score-card .delta { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.score-card .semaforo { display:inline-block; width: 14px; height: 14px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+@media print {
+  body { background: white; }
+  .sidebar, .topbar { display: none !important; }
+  .content { padding: 0 !important; }
+  .scorecard { box-shadow: none; }
+  .app-shell { grid-template-columns: 1fr !important; }
+}
+.print-btn { position: fixed; bottom: 24px; right: 24px; background: var(--primary); color: white; padding: 12px 20px; border-radius: 50px; box-shadow: var(--shadow-lg); cursor: pointer; font-size: 13px; font-weight: 600; }
+</style>
+<div class="page-header">
+  <div class="page-title">🎯 Score Card BTR Paraíso II</div>
+  <div class="page-subtitle">Resumo executivo · uma página · pronto para imprimir e enviar a investidor/banco</div>
+</div>
+<div class="scorecard">
+  <div class="score-header">
+    <div>
+      <h1>BTR Paraíso II</h1>
+      <div class="text-muted text-small">Habitação Seriada · 2 unidades · 154,84 m² · Senador Canedo/GO</div>
+      <div class="text-xs text-muted mt-3">Olive Tree Soluções Imobiliarias · CNPJ 57.615.284/0001-48</div>
+    </div>
+    <div class="meta">
+      <div>📅 Início: <strong>01/05/2026</strong></div>
+      <div>🎯 Entrega: <strong>28/10/2026</strong> (180d)</div>
+      <div id="scDate" style="margin-top:6px;">—</div>
+    </div>
+  </div>
+
+  <div class="score-section">
+    <div class="score-section-title">📊 Indicadores-Chave</div>
+    <div class="score-grid" id="scGrid"></div>
+  </div>
+
+  <div class="score-section">
+    <div class="score-section-title">🟢 Semáforo Executivo (5 dimensões)</div>
+    <div class="grid-2">
+      <div id="scSemaforo"></div>
+      <div class="card" style="background:var(--gray-50); margin-bottom:0;">
+        <div class="card-title">📝 Diagnóstico do Período</div>
+        <div id="scDiag" class="text-small mt-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="score-section">
+    <div class="score-section-title">📈 Curva S — Previsto × Realizado</div>
+    <div class="chart-wrap"><canvas id="scCS"></canvas></div>
+  </div>
+
+  <div class="score-section">
+    <div class="score-section-title">🎯 Próximos Marcos & Ações Críticas</div>
+    <div class="grid-2">
+      <div id="scMarcos"></div>
+      <div id="scAcoes"></div>
+    </div>
+  </div>
+
+  <div style="text-align:center; padding-top: 16px; border-top:1px solid var(--gray-200); color: var(--text-muted); font-size: 11px;">
+    Documento gerado automaticamente · btr-paraiso-ii.netlify.app · Ercilio Oliveira
+  </div>
+</div>
+<button class="print-btn" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>function initPage() { const D = window.DATA; 
+  document.getElementById('scDate').textContent = '🕐 Atualizado: ' + new Date().toLocaleDateString('pt-BR');
+
+  // KPI grid (5 cards)
+  const pct_fis = D.kpis.pct_fisico;
+  const pct_tempo = D.aggregations.tempo.pct_tempo;
+  const orc = D.kpis.orcamento_total;
+  const real = D.kpis.realizado;
+
+  // Semáforos
+  function sem(criterio) {
+    if (criterio === 'custo') {
+      if (D.aggregations.n_estouro >= 2) return {cls:'red', label:'CRÍTICO', icon:'🔴'};
+      if (D.aggregations.n_estouro >= 1) return {cls:'yellow', label:'ATENÇÃO', icon:'🟡'};
+      return {cls:'green', label:'OK', icon:'🟢'};
+    }
+    if (criterio === 'prazo') {
+      if (pct_fis < pct_tempo - 0.10) return {cls:'red', label:'ATRASADO', icon:'🔴'};
+      if (pct_fis < pct_tempo) return {cls:'yellow', label:'EM ATENÇÃO', icon:'🟡'};
+      return {cls:'green', label:'NO PRAZO', icon:'🟢'};
+    }
+    if (criterio === 'qualidade') {
+      return D.ocorrencias.length > 1 ? {cls:'yellow', label:'CUIDADO', icon:'🟡'}
+        : {cls:'green', label:'OK', icon:'🟢'};
+    }
+    if (criterio === 'compliance') {
+      const p = D.aggregations.comp_stats.pendente;
+      if (p >= 20) return {cls:'red', label:'CRÍTICO', icon:'🔴'};
+      if (p >= 10) return {cls:'yellow', label:'ATENÇÃO', icon:'🟡'};
+      return {cls:'green', label:'OK', icon:'🟢'};
+    }
+    if (criterio === 'roi') {
+      return {cls:'green', label:'VIÁVEL', icon:'🟢'};
+    }
+    return {cls:'gray', label:'—', icon:'⚪'};
+  }
+  const semCusto = sem('custo');
+  const semPrazo = sem('prazo');
+  const semQual = sem('qualidade');
+  const semComp = sem('compliance');
+  const semRoi = sem('roi');
+
+  document.getElementById('scGrid').innerHTML = `
+    <div class="score-card ${semCusto.cls}">
+      <div class="label">💰 Custo</div>
+      <div class="value">${(pct_fis*100).toFixed(1)}%</div>
+      <div class="delta">${fmt.money(real)} de ${fmt.money(orc)}</div>
+    </div>
+    <div class="score-card ${semPrazo.cls}">
+      <div class="label">⏱️ Prazo</div>
+      <div class="value">${(pct_tempo*100).toFixed(1)}%</div>
+      <div class="delta">${D.aggregations.tempo.decorridos}d / ${D.aggregations.tempo.total}d</div>
+    </div>
+    <div class="score-card ${semQual.cls}">
+      <div class="label">⚙️ Qualidade</div>
+      <div class="value">${D.kpis.total_rdos}</div>
+      <div class="delta">${D.ocorrencias.length} ocorrências</div>
+    </div>
+    <div class="score-card ${semComp.cls}">
+      <div class="label">⚖️ Compliance</div>
+      <div class="value">${D.aggregations.comp_stats.concluido}/${D.compliance.length}</div>
+      <div class="delta">${D.aggregations.comp_stats.pendente} pendentes</div>
+    </div>
+    <div class="score-card ${semRoi.cls}">
+      <div class="label">📈 ROI BTR</div>
+      <div class="value">10,1%</div>
+      <div class="delta">Cap Rate realista</div>
+    </div>
+  `;
+
+  document.getElementById('scSemaforo').innerHTML = `
+    <div style="background:var(--gray-50); padding:16px; border-radius:8px;">
+      <div style="padding:10px 0; border-bottom:1px solid var(--gray-200);"><span class="semaforo" style="background:${semCusto.cls === 'green' ? '#16A34A' : semCusto.cls === 'yellow' ? '#F59E0B' : '#DC2626'}"></span><strong>Custo:</strong> ${semCusto.icon} ${semCusto.label} — ${D.aggregations.n_estouro} etapa(s) em estouro</div>
+      <div style="padding:10px 0; border-bottom:1px solid var(--gray-200);"><span class="semaforo" style="background:${semPrazo.cls === 'green' ? '#16A34A' : semPrazo.cls === 'yellow' ? '#F59E0B' : '#DC2626'}"></span><strong>Prazo:</strong> ${semPrazo.icon} ${semPrazo.label} — diferença ${((pct_tempo-pct_fis)*100).toFixed(1)} p.p.</div>
+      <div style="padding:10px 0; border-bottom:1px solid var(--gray-200);"><span class="semaforo" style="background:${semQual.cls === 'green' ? '#16A34A' : '#F59E0B'}"></span><strong>Qualidade:</strong> ${semQual.icon} ${semQual.label} — ${D.kpis.total_rdos} RDOs, ${D.ocorrencias.length} ocorrência(s)</div>
+      <div style="padding:10px 0; border-bottom:1px solid var(--gray-200);"><span class="semaforo" style="background:${semComp.cls === 'green' ? '#16A34A' : semComp.cls === 'yellow' ? '#F59E0B' : '#DC2626'}"></span><strong>Compliance:</strong> ${semComp.icon} ${semComp.label} — ${D.aggregations.comp_stats.pendente}/${D.compliance.length} pendentes</div>
+      <div style="padding:10px 0;"><span class="semaforo" style="background:#16A34A"></span><strong>BTR ROI:</strong> ${semRoi.icon} ${semRoi.label} — Cap Rate 10,1% (acima da Selic)</div>
+    </div>
+  `;
+
+  // Diagnóstico
+  let diag = '';
+  if (pct_fis < pct_tempo - 0.10) diag += '🔴 <strong>Obra atrasada em execução.</strong> Acelerar Etapa 3 (Estrutura).<br>';
+  else if (pct_fis < pct_tempo) diag += '🟡 <strong>Levemente atrasado.</strong> Compras adiantadas compensam, mas execução precisa acelerar.<br>';
+  else diag += '🟢 <strong>Avanço financeiro saudável.</strong> Investimento adiantado em materiais.<br>';
+  if (D.aggregations.n_estouro > 0) diag += '🔴 <strong>' + D.aggregations.n_estouro + ' etapa(s) em estouro.</strong> Etapa 2 Fundações ultrapassou 118%.<br>';
+  diag += '🟡 <strong>RRT</strong> do RT expira 28/08/2026 — renovar.<br>';
+  diag += '🟡 R$ ' + (real/1000).toFixed(1) + 'k transitados via PF (Contrato Mútuo pendente).<br>';
+  diag += '🟢 <strong>BTR viável:</strong> Cap Rate 10,1% > Selic, payback ~10 anos.';
+  document.getElementById('scDiag').innerHTML = diag;
+
+  // Curva S
+  new Chart(document.getElementById('scCS'), {
+    type: 'line', data: { labels: D.cronograma_mensal.map(m => m.mes),
+      datasets: [
+        { label: 'Previsto', data: D.cronograma_mensal.map(m => m.acum_prev),
+          borderColor: '#1F4E78', borderWidth: 3, tension: 0.3, fill: false, pointRadius: 4 },
+        { label: 'Realizado', data: D.cronograma_mensal.map(m => m.acum_real),
+          borderColor: '#16A34A', borderWidth: 3, tension: 0.3, fill: true, backgroundColor: 'rgba(22,163,74,0.1)', pointRadius: 4 }
+      ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' }},
+      scales: { y: { beginAtZero: true, ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' }}}}
+  });
+
+  // Marcos
+  document.getElementById('scMarcos').innerHTML = `
+    <div class="card" style="background:var(--gray-50); margin-bottom:0;">
+      <div class="card-title">📅 Próximos Marcos</div>
+      <ul style="font-size:13px; line-height:1.8; list-style:none; margin-top:8px;">
+        <li>🔄 <strong>29/05:</strong> Conclusão muro de arrimo + aterro</li>
+        <li>📐 <strong>Jun/26:</strong> Conclusão Etapa 2 (Fundações)</li>
+        <li>🏗️ <strong>Jul/26:</strong> Conclusão Etapa 3 (Estrutura)</li>
+        <li>🧱 <strong>Ago/26:</strong> Conclusão Etapa 4 (Alvenaria) + Cobertura</li>
+        <li>⚡ <strong>Set/26:</strong> Instalações Elétricas/Hidráulicas</li>
+        <li>🎨 <strong>Out/26:</strong> Acabamentos + Habite-se</li>
+      </ul>
+    </div>
+  `;
+
+  document.getElementById('scAcoes').innerHTML = `
+    <div class="card" style="background:var(--gray-50); margin-bottom:0;">
+      <div class="card-title">⚠️ Ações Críticas (próx 30 dias)</div>
+      <ul style="font-size:13px; line-height:1.8; list-style:none; margin-top:8px;">
+        <li>🔴 Instalar dreno PVC antes do aterro</li>
+        <li>🔴 Reorçar Etapa 2 (R$20k → R$32k)</li>
+        <li>🟡 Assinar Contrato Sep. Muro de Arrimo</li>
+        <li>🟡 Formalizar Mútuo PF→PJ</li>
+        <li>🟡 Emitir CNO da obra (e-CAC RFB)</li>
+        <li>🟡 Renovar RRT Fabricio (vence 28/08)</li>
+      </ul>
+    </div>
+  `;
+ }</script>
+</body>
+</html>

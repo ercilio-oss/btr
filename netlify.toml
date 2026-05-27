@@ -1,0 +1,12 @@
+[build]
+  publish = "site_v2"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+[[redirects]]
+  from = "/index.html"
+  to = "/"
+  status = 301

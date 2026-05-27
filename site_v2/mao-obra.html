@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mão de Obra — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="mao-obra">
+<div id="original-content">
+<div class="page-header">
+  <div class="page-title">👷 Mão de Obra</div>
+  <div class="page-subtitle">Profissionais e diaristas que trabalharam na obra</div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-label">Profissionais Únicos</div><div class="kpi-value" id="moCount">—</div></div>
+  <div class="kpi success"><div class="kpi-label">Total Pago MO</div><div class="kpi-value" id="moTotal">—</div></div>
+  <div class="kpi warning"><div class="kpi-label">CPF Pendentes</div><div class="kpi-value" id="moPend">—</div></div>
+  <div class="kpi danger"><div class="kpi-label">Sem RPA/Contrato</div><div class="kpi-value" id="moSemRpa">—</div></div>
+</div>
+
+<div class="alert alert-warning">
+  <div class="alert-icon">⚠️</div>
+  <div class="alert-body">
+    <div class="alert-title">Risco trabalhista — formalização</div>
+    Diaristas pagos via PIX sem RPA ou contrato. Recomendação: emitir Recibo Simples de Pagamento (CPF + valor + descrição) ou contratar via MEI/RPA para evitar caracterização de vínculo CLT.
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">Profissionais</div></div>
+  <div class="table-wrap">
+    <table id="profTable">
+      <thead><tr>
+        <th>Nome</th><th>Tipo</th><th>Função/Serviço</th>
+        <th class="num">Total Pago</th><th>CPF/CNPJ</th><th>Status</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>function initPage() { const D = window.DATA; 
+  const agreg = {};
+  D.fornecedores.filter(f => f.tipo === 'Mão de Obra' || f.tipo === 'Serviço').forEach(f => {
+    const nome = f.fornecedor.replace('[','').replace(']','').trim();
+    if (!agreg[nome]) agreg[nome] = { nome, tipo: f.tipo, funcao: f.descricao, total: 0, cnpj: f.cnpj || '—', count: 0 };
+    agreg[nome].total += f.valor_bruto;
+    agreg[nome].count += 1;
+  });
+  const profs = Object.values(agreg).sort((a,b) => b.total - a.total);
+  const semCpf = profs.filter(p => !p.cnpj || p.cnpj.includes('[') || p.cnpj.includes('obter')).length;
+  const totalMO = profs.reduce((s, p) => s + p.total, 0);
+
+  document.getElementById('moCount').textContent = profs.length;
+  document.getElementById('moTotal').textContent = fmt.money(totalMO);
+  document.getElementById('moPend').textContent = semCpf;
+  document.getElementById('moSemRpa').textContent = profs.filter(p => p.tipo === 'Mão de Obra').length;
+
+  document.querySelector('#profTable tbody').innerHTML = profs.map(p => {
+    const semCpf = !p.cnpj || p.cnpj.includes('[') || p.cnpj.includes('obter');
+    return `<tr>
+      <td><strong>${p.nome}</strong></td>
+      <td>${statusBadge(p.tipo)}</td>
+      <td class="text-small text-muted">${p.funcao.substring(0, 80)}</td>
+      <td class="num text-bold">${fmt.money(p.total)}</td>
+      <td class="text-xs ${semCpf ? 'text-danger' : ''}">${p.cnpj}</td>
+      <td>${statusBadge(semCpf ? 'Pendente' : 'OK')}</td>
+    </tr>`;
+  }).join('');
+ }</script>
+</body>
+</html>

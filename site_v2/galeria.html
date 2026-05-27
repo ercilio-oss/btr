@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Galeria — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="galeria">
+<div id="original-content">
+<style>
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.photo-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; transition: transform 0.15s; cursor: pointer; }
+.photo-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+.photo-img { aspect-ratio: 4/3; background: linear-gradient(135deg, var(--gray-300), var(--gray-400)); display: flex; align-items: center; justify-content: center; color: white; font-size: 28px; }
+.photo-meta { padding: 10px 12px; font-size: 12px; }
+.photo-rdo { color: var(--primary); font-weight: 600; }
+.photo-date { color: var(--text-muted); font-size: 11px; }
+.upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 40px; text-align: center; background: var(--gray-50); cursor: pointer; transition: all 0.15s; }
+.upload-zone:hover { border-color: var(--primary-light); background: var(--info-bg); }
+</style>
+<div class="page-header">
+  <div class="page-title">📷 Galeria de Fotos</div>
+  <div class="page-subtitle">Organizado por RDO e etapa · clique para abrir · use mais.ControleERP para fotos com Timemark verificado</div>
+</div>
+
+<div class="alert alert-info">
+  <div class="alert-icon">📸</div>
+  <div class="alert-body">
+    <div class="alert-title">Fotos oficiais ficam no mais.ControleERP</div>
+    O RDO #3 (27/05) tem 21+ fotos do muro de arrimo já no mais.ControleERP com selo Timemark. Aqui você pode adicionar fotos extras e organizar por etapa.
+    <a href="https://report.maiscontroleerp.com.br/daily-fields/2fd9f642-f935-4dec-9e8f-8b24ba656883" target="_blank" style="color:#1E40AF; text-decoration:underline;">Ver RDO #3 no mais.ControleERP →</a>
+  </div>
+</div>
+
+<div class="filters">
+  <select class="select" id="galRdo" onchange="renderGal()">
+    <option value="todos">Todos os RDOs</option>
+  </select>
+  <select class="select" id="galEtapa" onchange="renderGal()">
+    <option value="todas">Todas as etapas</option>
+  </select>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">📁 Galeria por RDO</div><div class="card-meta" id="galCount">—</div></div>
+  <div id="gallery" class="gallery-grid"></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">⬆️ Upload de Fotos</div></div>
+  <div class="upload-zone" onclick="document.getElementById('fileUpload').click()">
+    <div style="font-size:48px;">📸</div>
+    <div class="text-bold mt-3">Clique para enviar fotos</div>
+    <div class="text-small text-muted mt-3">Em breve: integração direta com Drive olive.inc / mais.ControleERP</div>
+    <input type="file" id="fileUpload" multiple accept="image/*" style="display:none;" onchange="onUpload(this)">
+  </div>
+  <div id="uploadList" style="margin-top:14px;"></div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>function initPage() { const D = window.DATA; 
+  const rdoSel = document.getElementById('galRdo');
+  [...new Set(D.rdos.map(r => r.numero))].sort((a,b) => a-b).forEach(n => {
+    rdoSel.insertAdjacentHTML('beforeend', `<option value="${n}">RDO #${n}</option>`);
+  });
+
+  const etapaSel = document.getElementById('galEtapa');
+  const etapasUnicas = [...new Set(D.atividades_log.map(a => a.cod))].sort();
+  etapasUnicas.forEach(c => {
+    etapaSel.insertAdjacentHTML('beforeend', `<option value="${c}">${c}</option>`);
+  });
+
+  window.renderGal = () => {
+    const r = rdoSel.value;
+    const e = etapaSel.value;
+    // Construir lista simulada de fotos baseada nos RDOs
+    let fotos = [];
+    D.rdos.forEach(rdo => {
+      const atvs = D.atividades_log.filter(a => a.rdo === rdo.numero);
+      atvs.forEach(atv => {
+        // Simular 1-3 fotos por atividade
+        const n = atv.cod === 'F4' ? 5 : 1; // mais fotos pro muro de arrimo
+        for (let i = 0; i < n; i++) {
+          fotos.push({
+            rdo: rdo.numero,
+            cod: atv.cod,
+            etapa: atv.etapa,
+            data: rdo.data,
+            desc: atv.descricao,
+            i: i+1, total: n
+          });
+        }
+      });
+    });
+    if (r !== 'todos') fotos = fotos.filter(f => String(f.rdo) === r);
+    if (e !== 'todas') fotos = fotos.filter(f => f.cod === e);
+
+    document.getElementById('galCount').textContent = `${fotos.length} fotos`;
+    document.getElementById('gallery').innerHTML = fotos.map(f => {
+      const icon = f.cod === 'F4' ? '🧱' : f.cod === '1' ? '🧹' : f.cod === '2' ? '🏗️' : f.cod === '4' ? '🧱' : '📸';
+      const cor = f.cod === 'F4' ? 'linear-gradient(135deg, #DC2626, #F59E0B)' :
+                  f.cod === '1' ? 'linear-gradient(135deg, #2E75B6, #1F4E78)' :
+                  f.cod === '2' ? 'linear-gradient(135deg, #16A34A, #15803D)' :
+                  'linear-gradient(135deg, #6B7280, #4B5563)';
+      return `<div class="photo-card" onclick="alert('Foto: RDO #${f.rdo} · ${f.etapa}\n\nIntegração com Drive em breve.')">
+        <div class="photo-img" style="background: ${cor}">${icon}</div>
+        <div class="photo-meta">
+          <div class="photo-rdo">RDO #${f.rdo} · ${f.cod}</div>
+          <div class="text-xs">${f.etapa}</div>
+          <div class="photo-date">${fmt.date(f.data)} · foto ${f.i}/${f.total}</div>
+        </div>
+      </div>`;
+    }).join('');
+  };
+  renderGal();
+
+  window.onUpload = (input) => {
+    const files = Array.from(input.files);
+    const ul = document.getElementById('uploadList');
+    ul.innerHTML = files.map(f => `<div style="padding:8px 12px; background:var(--gray-50); border-radius:6px; margin-bottom:6px; font-size:13px;">
+      📎 ${f.name} <span class="text-muted text-small">(${(f.size/1024).toFixed(1)} KB)</span> — <span class="text-warning">aguardando integração com Drive</span>
+    </div>`).join('');
+  };
+ }</script>
+</body>
+</html>

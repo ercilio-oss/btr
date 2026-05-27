@@ -1,0 +1,79 @@
+═══════════════════════════════════
+🏗️ RDO — BTR PARAÍSO II
+═══════════════════════════════════
+*Modelo para envio diário via WhatsApp*
+*Copiar, preencher os campos e enviar ao Ercilio*
+
+📅 *Data:* ____/____/2026
+📆 *Dia:* (seg/ter/qua/qui/sex/sáb)
+🆔 *RDO Nº:* _____
+⏰ *Início:* ____:____  *Fim:* ____:____
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌤️ *CLIMA*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Manhã: ☀️Bom / ☁️Nublado / 🌧️Chuva
+• Tarde: ☀️Bom / ☁️Nublado / 🌧️Chuva
+• Condição: ✅Praticável / ⚠️Parcial / ❌Impraticável
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👷 *EFETIVO (quantos hoje)*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Pedreiro: ___
+• Servente: ___
+• Eletricista: ___
+• Encanador: ___
+• Carpinteiro/Armador: ___
+• Pintor: ___
+• Outros: ___
+• *TOTAL:* ___
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔨 *ATIVIDADES DO DIA*
+(Unid 1 / Unid 2 / Áreas comuns)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1.
+2.
+3.
+
+📍 *Etapa (cronograma):*
+(Ex: Estrutura / Alvenaria / Elétrica / Acabamento)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 *MATERIAL RECEBIDO HOJE*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Item / Qtd / Fornecedor / NF nº
+1.
+2.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ *OCORRÊNCIAS*
+(atrasos, falta de material, acidente, chuva, visita fiscal)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📸 *FOTOS* (mín. 3)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Enviar logo após este RDO:
+1. Foto geral da obra
+2. Foto da frente de trabalho do dia
+3. Foto de detalhe / material / problema
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📅 *AMANHÃ (D+1) — Planejamento*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1.
+2.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✍️ *Gestor:* Osias Neris
+═══════════════════════════════════
+
+📋 *COMO ESTOU ANALISANDO:*
+Quando você (Ercilio) me encaminhar este RDO, eu:
+✓ Registro na planilha mestra (aba 01_RDO_Diario)
+✓ Atualizo % físico no cronograma (aba 03)
+✓ Cruzo com custos do dia (aba 02)
+✓ Sinalizo ocorrências críticas no risco (aba 05)
+✓ Verifico compliance (aba 06) se houver fiscalização

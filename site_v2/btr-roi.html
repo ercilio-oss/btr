@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BTR / ROI — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="btr-roi">
+<div id="original-content">
+<div class="page-header">
+  <div class="page-title">📈 BTR / ROI</div>
+  <div class="page-subtitle">Cap Rate · Payback · Yield · cálculo COMPLETO com Terreno + Obra</div>
+</div>
+
+<div class="alert alert-info">
+  <div class="alert-icon">🏞️</div>
+  <div class="alert-body">
+    <div class="alert-title">CapEx Total inclui Aquisição do Terreno</div>
+    Terreno: <strong>R$ 140.000</strong> (Santiago Pires, 20/02/2026, Starling Bank UK) + Construção: <strong>R$ 431.800</strong> = <strong>R$ 571.800 CapEx Total</strong>. Cap Rate calculado sobre o investimento completo (visão correta do retorno).
+  </div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-label">CapEx Total</div><div class="kpi-value" id="btrCapex">—</div><div class="kpi-delta" id="btrCapexD">—</div></div>
+  <div class="kpi success"><div class="kpi-label">Aluguel-Alvo Realista</div><div class="kpi-value">R$ 2.000<span class="text-small text-muted">/mês</span></div><div class="kpi-delta">por unidade</div></div>
+  <div class="kpi accent"><div class="kpi-label">Cap Rate (c/ terreno)</div><div class="kpi-value" id="btrCap">—</div><div class="kpi-delta">sobre CapEx total</div></div>
+  <div class="kpi warning"><div class="kpi-label">Payback (c/ terreno)</div><div class="kpi-value" id="btrPay">—</div><div class="kpi-delta">tempo de retorno</div></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><div class="card-title">🏞️ Decomposição do CapEx</div></div>
+    <div class="chart-wrap"><canvas id="capexChart"></canvas></div>
+    <div class="mt-4" style="font-size:13px;">
+      <div class="flex-between" style="padding:6px 0;"><span>🏗️ Construção (Obra)</span><strong id="capConstr">—</strong></div>
+      <div class="flex-between" style="padding:6px 0; border-top:1px dashed var(--gray-200);"><span>🏞️ Aquisição Terreno</span><strong id="capTerr">—</strong></div>
+      <div class="flex-between" style="padding:8px 0; border-top:2px solid var(--primary);"><strong>Total Investimento</strong><strong id="capTotal" style="color:var(--primary);">—</strong></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">📊 Impacto do Terreno no Cap Rate</div></div>
+    <div class="chart-wrap"><canvas id="capImpChart"></canvas></div>
+    <div class="alert alert-warning mt-4">
+      <div class="alert-body text-small">
+        <strong>Cuidado contábil:</strong> muitos investidores BTR esquecem de incluir o terreno no denominador do Cap Rate. Isso superestima a rentabilidade. O cálculo correto INCLUI sempre o CapEx total.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">📊 Cenários de ROI BTR (cálculo COMPLETO com terreno)</div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Cenário</th><th class="num">Aluguel/Unid</th><th class="num">Ocup.</th>
+        <th class="num">Reajuste a.a.</th>
+        <th class="num">Receita Bruta</th><th class="num">NOI Anual</th>
+        <th class="num">Cap Rate<br><small>s/ Terreno</small></th><th class="num">Cap Rate<br><small>c/ Terreno</small></th>
+        <th class="num">Payback<br><small>c/ Terreno</small></th>
+      </tr></thead>
+      <tbody id="btrTable"></tbody>
+    </table>
+  </div>
+  <div class="text-xs text-muted mt-4">NOI = Receita × ocupação − 8% admin − R$ 1.200/ano IPTU/unid − R$ 600/ano despesa op./unid. · Otimista assume reajuste de 8% a.a. (IGP-M histórico) no payback dinâmico.</div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><div class="card-title">📈 Cap Rate vs Benchmarks</div></div>
+    <div class="chart-wrap"><canvas id="capChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">⏰ Payback Comparativo</div></div>
+    <div class="chart-wrap"><canvas id="payChart"></canvas></div>
+  </div>
+</div>
+
+<!-- ===================== ESTRATÉGIA: VENDA + ALUGUEL ===================== -->
+<div class="card" style="border-left: 4px solid var(--accent);">
+  <div class="card-header">
+    <div class="card-title">💡 Estratégia Alternativa: Vender 1 unidade + Alugar 1</div>
+    <div class="card-meta">comparação com Aluguel de 2</div>
+  </div>
+
+  <div class="alert alert-info">
+    <div class="alert-icon">🎯</div>
+    <div class="alert-body">
+      <div class="alert-title">Por que considerar essa estratégia?</div>
+      Vender 1 unidade <strong>recupera capital imediatamente</strong>, que aplicado em renda fixa rende ~10% líquido. A outra unidade gera aluguel. Combinado, o retorno anual pode superar alugar as 2 unidades.
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div>
+      <label class="text-xs text-muted">💰 Preço de Venda 1 unid (R$)</label>
+      <input type="number" id="vaPreco" class="input" value="330000" oninput="recalcVA()" style="width:100%;">
+    </div>
+    <div>
+      <label class="text-xs text-muted">🏢 Corretagem (%)</label>
+      <input type="number" id="vaCorr" class="input" value="6" step="0.5" oninput="recalcVA()" style="width:100%;">
+    </div>
+    <div>
+      <label class="text-xs text-muted">📊 Selic líquida do capital recuperado (%)</label>
+      <input type="number" id="vaSelic" class="input" value="10" step="0.5" oninput="recalcVA()" style="width:100%;">
+    </div>
+  </div>
+
+  <div class="kpi-grid mt-4">
+    <div class="kpi"><div class="kpi-label">Líquido da Venda</div><div class="kpi-value" id="vaLiq">—</div><div class="kpi-delta" id="vaLiqD">—</div></div>
+    <div class="kpi success"><div class="kpi-label">Renda Aluguel/Ano</div><div class="kpi-value" id="vaAlug">—</div><div class="kpi-delta">NOI 1 unidade</div></div>
+    <div class="kpi accent"><div class="kpi-label">Renda Capital/Ano</div><div class="kpi-value" id="vaRenda">—</div><div class="kpi-delta">Selic do líquido vendido</div></div>
+    <div class="kpi warning"><div class="kpi-label">Retorno TOTAL/Ano</div><div class="kpi-value" id="vaTotal">—</div><div class="kpi-delta" id="vaTotalD">—</div></div>
+  </div>
+
+  <div class="card-header" style="margin-top: 20px;">
+    <div class="card-title">⚔️ Comparação direta: Alugar 2 vs Venda+Aluguel</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Estratégia</th>
+        <th class="num">Aluguel/Unid</th>
+        <th class="num">Renda Aluguel</th>
+        <th class="num">Renda Capital</th>
+        <th class="num">Retorno Total/Ano</th>
+        <th class="num">Cap Rate sobre CapEx Total</th>
+        <th>Liquidez</th>
+      </tr></thead>
+      <tbody id="vaCompTable"></tbody>
+    </table>
+  </div>
+
+  <div class="grid-2 mt-4">
+    <div class="card" style="background:var(--gray-50); margin-bottom:0;">
+      <div class="card-title">📊 Componentes da estratégia V+A</div>
+      <div id="vaDetalhe" style="font-size:13px; line-height:1.9;"></div>
+    </div>
+    <div class="card" style="background:var(--gray-50); margin-bottom:0;">
+      <div class="card-title">⚖️ Trade-offs</div>
+      <ul style="font-size:13px; line-height:1.8; list-style:none;">
+        <li><strong style="color:var(--success);">✓ Pró Venda+Aluguel:</strong></li>
+        <li>• Capital recuperado em ~30-60 dias (vs 13 anos de aluguel)</li>
+        <li>• Diversifica risco (CDI + imóvel)</li>
+        <li>• Reduz exposição operacional</li>
+        <li>• Habilita re-investimento em nova obra</li>
+        <li>—</li>
+        <li><strong style="color:var(--danger);">✗ Contra Venda+Aluguel:</strong></li>
+        <li>• Perde valorização do imóvel (5-8% a.a.)</li>
+        <li>• Tributação imediata (IR ganho capital)</li>
+        <li>• Tem que achar comprador (vai vender por R$ 330k mesmo?)</li>
+        <li>• Selic pode cair (lock-in 11,75% atual)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="alert mt-4" id="vaConclusao"></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">🎯 Análise & Plano de Ação</div></div>
+  <div class="grid-2">
+    <div>
+      <div class="text-bold mb-3">📊 Diagnóstico atual</div>
+      <ul style="font-size:13px; line-height:1.9; list-style:none;">
+        <li><strong>Cap Rate realista (c/ terreno):</strong> <span id="diagCap">—</span></li>
+        <li>vs <strong>Selic ~11,75%</strong>: <span id="diagSelic">—</span></li>
+        <li>vs <strong>BTR GO média 8-12%</strong>: <span id="diagMedia">—</span></li>
+        <li><strong>Para destravar:</strong> aluguel ≥ R$ 2.500 ou reduzir CapEx</li>
+        <li><strong>Yield on Cost completo:</strong> <span id="diagYoc">—</span></li>
+      </ul>
+    </div>
+    <div>
+      <div class="text-bold mb-3">🎯 Ações estratégicas</div>
+      <ol style="font-size:13px; line-height:1.9; padding-left:20px;">
+        <li>Cotar aluguel real com 3 imobiliárias locais (próx 2 sem)</li>
+        <li>Considerar venda de 1 unidade + alugar 1 (capital ↑)</li>
+        <li>Aluguel anual antecipado com 5% desconto (liquidez)</li>
+        <li>Avaliar caução vs seguro-fiança</li>
+        <li>Pré-locação durante a obra (BTR puro)</li>
+        <li>Reavaliar o capex do terreno na venda futura (provável valorização Senador Canedo)</li>
+      </ol>
+    </div>
+  </div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>
+function initPage() {
+  const D = window.DATA;
+  const inv = D.aggregations.investimento;
+
+  // KPIs
+  document.getElementById('btrCapex').textContent = fmt.money(inv.capex_total);
+  document.getElementById('btrCapexD').textContent = 'Obra ' + fmt.moneyShort(inv.capex_construcao) + ' + Terreno ' + fmt.moneyShort(inv.capex_terreno);
+  document.getElementById('capConstr').textContent = fmt.money(inv.capex_construcao);
+  document.getElementById('capTerr').textContent = fmt.money(inv.capex_terreno);
+  document.getElementById('capTotal').textContent = fmt.money(inv.capex_total);
+
+  const capex_obra = inv.capex_construcao;
+  const capex_total = inv.capex_total;
+
+  const cenarios = [
+    { nome: '📉 Conservador', aluguel: 2000, ocup: 0.95, adm: 0.08, iptu: 1200, desp: 600, reajuste: 0.00 },
+    { nome: '🎯 Realista',    aluguel: 2500, ocup: 0.95, adm: 0.08, iptu: 1200, desp: 600, reajuste: 0.00 },
+    { nome: '📈 Otimista',    aluguel: 3500, ocup: 0.95, adm: 0.08, iptu: 1200, desp: 600, reajuste: 0.08 },
+  ];
+  const linhas = cenarios.map(c => {
+    const rec = c.aluguel * 12 * 2 * c.ocup;
+    const noi = rec - (rec * c.adm) - (c.iptu * 2) - (c.desp * 2);
+    // Payback c/ reajuste anual composto: resolve t em capex = NOI*((1+r)^t-1)/r quando r>0, senão capex/NOI
+    let pay_total_dyn = capex_total / noi;
+    let pay_obra_dyn  = capex_obra  / noi;
+    if (c.reajuste > 0) {
+      const r = c.reajuste;
+      pay_total_dyn = Math.log(1 + (capex_total*r/noi)) / Math.log(1+r);
+      pay_obra_dyn  = Math.log(1 + (capex_obra *r/noi)) / Math.log(1+r);
+    }
+    return { ...c, rec, noi,
+      cap_obra: noi/capex_obra, cap_total: noi/capex_total,
+      pay_obra: pay_obra_dyn, pay_total: pay_total_dyn };
+  });
+
+  document.getElementById('btrCap').textContent = (linhas[1].cap_total*100).toFixed(1) + '%';
+  document.getElementById('btrPay').textContent = linhas[1].pay_total.toFixed(1) + ' anos';
+
+  // Diagnóstico
+  const cap = linhas[1].cap_total*100;
+  document.getElementById('diagCap').textContent = cap.toFixed(1) + '%';
+  document.getElementById('diagSelic').innerHTML = cap < 11.75 ? '<span class="text-danger">abaixo (-' + (11.75-cap).toFixed(1) + 'pp)</span>' : '<span class="text-success">acima</span>';
+  document.getElementById('diagMedia').innerHTML = cap < 8 ? '<span class="text-danger">abaixo</span>' : cap < 12 ? '<span class="text-warning">no piso</span>' : '<span class="text-success">acima</span>';
+  document.getElementById('diagYoc').textContent = (linhas[1].noi/capex_total*100).toFixed(1) + '%';
+
+  document.querySelector('#btrTable').innerHTML = linhas.map((l,i) => `<tr ${i===1 ? 'style="background:var(--gray-50);"' : ''}>
+    <td><strong>${l.nome}</strong></td>
+    <td class="num">${fmt.money(l.aluguel)}</td>
+    <td class="num">${(l.ocup*100).toFixed(0)}%</td>
+    <td class="num ${l.reajuste > 0 ? 'text-success' : 'text-muted'}">${(l.reajuste*100).toFixed(0)}%</td>
+    <td class="num">${fmt.money(l.rec)}</td>
+    <td class="num text-bold">${fmt.money(l.noi)}</td>
+    <td class="num text-muted">${(l.cap_obra*100).toFixed(1)}%</td>
+    <td class="num text-bold ${l.cap_total >= 0.10 ? 'text-success' : l.cap_total >= 0.08 ? 'text-warning' : 'text-danger'}">${(l.cap_total*100).toFixed(1)}%</td>
+    <td class="num">${l.pay_total.toFixed(1)} anos</td>
+  </tr>`).join('');
+
+  new Chart(document.getElementById('capexChart'), {
+    type: 'doughnut',
+    data: { labels: ['Construção (Obra)', 'Aquisição Terreno'],
+      datasets: [{ data: [inv.capex_construcao, inv.capex_terreno],
+        backgroundColor: ['#1F4E78', '#FFC000'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }} }
+  });
+
+  new Chart(document.getElementById('capImpChart'), {
+    type: 'bar',
+    data: { labels: ['Conservador', 'Realista', 'Otimista'],
+      datasets: [
+        { label: 'Cap Rate s/ Terreno', data: linhas.map(l => (l.cap_obra*100).toFixed(1)), backgroundColor: '#BDD7EE' },
+        { label: 'Cap Rate c/ Terreno', data: linhas.map(l => (l.cap_total*100).toFixed(1)), backgroundColor: '#1F4E78' }
+      ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' }},
+      scales: { y: { beginAtZero: true, ticks: { callback: v => v + '%' }}}}
+  });
+
+  new Chart(document.getElementById('capChart'), {
+    type: 'bar',
+    data: { labels: ['Conservador', 'Realista', 'Otimista', 'Selic atual', 'BTR GO média'],
+      datasets: [{ data: [linhas[0].cap_total*100, linhas[1].cap_total*100, linhas[2].cap_total*100, 11.75, 9.5],
+        backgroundColor: ['#DC2626', '#16A34A', '#1F4E78', '#9CA3AF', '#FFC000'] }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }},
+      scales: { y: { beginAtZero: true, ticks: { callback: v => v + '%' }}}}
+  });
+
+  new Chart(document.getElementById('payChart'), {
+    type: 'bar',
+    data: { labels: ['Conservador', 'Realista', 'Otimista'],
+      datasets: [
+        { label: 'Payback s/ Terreno', data: linhas.map(l => l.pay_obra.toFixed(1)), backgroundColor: '#BDD7EE' },
+        { label: 'Payback c/ Terreno', data: linhas.map(l => l.pay_total.toFixed(1)), backgroundColor: '#1F4E78' }
+      ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' }},
+      scales: { y: { beginAtZero: true, ticks: { callback: v => v + ' anos' }}}}
+  });
+
+  // ============================================================
+  // ESTRATÉGIA: VENDA + ALUGUEL
+  // ============================================================
+  window.recalcVA = () => {
+    const preco = Number(document.getElementById('vaPreco').value) || 330000;
+    const corrPct = (Number(document.getElementById('vaCorr').value) || 6) / 100;
+    const selic = (Number(document.getElementById('vaSelic').value) || 10) / 100;
+
+    const capex_unid = capex_total / 2; // R$ 285.900
+    const corretagem = preco * corrPct;
+    const lucroBruto = preco - capex_unid;
+    const ir = lucroBruto > 0 ? lucroBruto * 0.15 : 0; // IR 15% ganho capital PF
+    const liquido = preco - corretagem - ir;
+
+    // 3 cenários de aluguel
+    const cenariosVA = cenarios.map(c => {
+      const rec1 = c.aluguel * 12 * c.ocup; // 1 unidade só
+      const noi1 = rec1 - (rec1 * c.adm) - c.iptu - c.desp;
+      const rendaSelic = liquido * selic;
+      const totalAno = noi1 + rendaSelic;
+      const capRate = totalAno / capex_total;
+      return { ...c, noi1, rendaSelic, totalAno, capRate, liquido };
+    });
+
+    // Cenário Realista
+    const va = cenariosVA[1];
+    document.getElementById('vaLiq').textContent = fmt.money(va.liquido);
+    document.getElementById('vaLiqD').textContent = `de R$ ${preco.toLocaleString('pt-BR')} − corret. ${fmt.moneyShort(corretagem)} − IR ${fmt.moneyShort(ir)}`;
+    document.getElementById('vaAlug').textContent = fmt.money(va.noi1);
+    document.getElementById('vaRenda').textContent = fmt.money(va.rendaSelic);
+    document.getElementById('vaTotal').textContent = fmt.money(va.totalAno);
+    document.getElementById('vaTotalD').textContent = `Cap Rate ${(va.capRate*100).toFixed(1)}%`;
+
+    // Comparativo
+    const realista2 = linhas[1]; // Alugar 2 - Realista
+    const rows = [
+      { nome: '🏠 Alugar 2 unidades (Realista)', alug: cenarios[1].aluguel, alugRenda: realista2.noi, capRenda: 0,
+        total: realista2.noi, capRate: realista2.cap_total, liq: `Aluguel mensal, capital travado ${realista2.pay_total.toFixed(1)} anos` },
+      { nome: '💰 V+A: Vender 1 + Alugar 1 (Realista)', alug: cenarios[1].aluguel, alugRenda: va.noi1,
+        capRenda: va.rendaSelic, total: va.totalAno, capRate: va.capRate, liq: 'Capital recuperado em 30-60 dias' },
+      { nome: `💰 V+A: Conservador (R$ ${cenarios[0].aluguel.toLocaleString('pt-BR')}/mês)`, alug: cenarios[0].aluguel, alugRenda: cenariosVA[0].noi1,
+        capRenda: cenariosVA[0].rendaSelic, total: cenariosVA[0].totalAno, capRate: cenariosVA[0].capRate, liq: 'Capital recuperado' },
+      { nome: `💰 V+A: Otimista (R$ ${cenarios[2].aluguel.toLocaleString('pt-BR')}/mês)`, alug: cenarios[2].aluguel, alugRenda: cenariosVA[2].noi1,
+        capRenda: cenariosVA[2].rendaSelic, total: cenariosVA[2].totalAno, capRate: cenariosVA[2].capRate, liq: 'Capital recuperado' },
+    ];
+    document.querySelector('#vaCompTable').innerHTML = rows.map((r, i) => {
+      const hl = i === 1 ? 'style="background:var(--success-bg);"' : (i === 0 ? 'style="background:var(--info-bg);"' : '');
+      const capCls = r.capRate >= 0.10 ? 'text-success' : r.capRate >= 0.08 ? 'text-warning' : 'text-danger';
+      return `<tr ${hl}>
+        <td><strong>${r.nome}</strong></td>
+        <td class="num">${fmt.money(r.alug)}</td>
+        <td class="num">${fmt.money(r.alugRenda)}</td>
+        <td class="num">${fmt.money(r.capRenda)}</td>
+        <td class="num text-bold">${fmt.money(r.total)}</td>
+        <td class="num text-bold ${capCls}">${(r.capRate*100).toFixed(1)}%</td>
+        <td class="text-xs">${r.liq}</td>
+      </tr>`;
+    }).join('');
+
+    // Detalhes
+    document.getElementById('vaDetalhe').innerHTML = `
+      <div><strong>Preço de venda:</strong> ${fmt.money(preco)}</div>
+      <div style="padding-left:14px; color:var(--danger);">− Corretagem ${(corrPct*100).toFixed(1)}%: ${fmt.money(corretagem)}</div>
+      <div style="padding-left:14px; color:var(--danger);">− IR ganho capital 15% (sobre lucro ${fmt.money(lucroBruto)}): ${fmt.money(ir)}</div>
+      <div style="border-top:1px solid var(--gray-200); padding-top:6px;"><strong>Líquido da venda:</strong> ${fmt.money(va.liquido)}</div>
+      <div style="margin-top:8px;"><strong>Capital recuperado aplicado:</strong> ${fmt.money(va.liquido)} × ${(selic*100).toFixed(1)}% = ${fmt.money(va.rendaSelic)}/ano</div>
+      <div style="margin-top:8px;"><strong>Custo da unidade restante:</strong> ${fmt.money(capex_unid)}</div>
+      <div style="margin-top:8px;"><strong>Aluguel R$ ${cenarios[1].aluguel.toLocaleString('pt-BR')}/mês:</strong> ${fmt.money(va.noi1)}/ano NOI</div>
+    `;
+
+    // Conclusão
+    const diff = va.totalAno - realista2.noi;
+    const diffPct = ((va.totalAno / realista2.noi) - 1) * 100;
+    let conclCls, conclTxt;
+    if (diff > 5000) {
+      conclCls = 'alert-success';
+      conclTxt = `<div class="alert-icon">✅</div><div class="alert-body"><div class="alert-title">Venda+Aluguel é mais rentável (+${fmt.money(diff)}/ano ou +${diffPct.toFixed(1)}%)</div>
+        Ganho anual de <strong>${fmt.money(diff)}</strong> a mais que alugar 2. Em 5 anos: <strong>${fmt.money(diff*5)}</strong> de diferença. Estratégia recomendada SE conseguir vender por R$ ${preco.toLocaleString('pt-BR')}.</div>`;
+    } else if (diff > 0) {
+      conclCls = 'alert-warning';
+      conclTxt = `<div class="alert-icon">⚠️</div><div class="alert-body"><div class="alert-title">Venda+Aluguel marginalmente melhor (+${fmt.money(diff)}/ano)</div>
+        Diferença pequena (~${diffPct.toFixed(1)}%). Depende mais de fatores não-financeiros: liquidez urgente? aposta em valorização? prefere passivo ou ativo?</div>`;
+    } else {
+      conclCls = 'alert-danger';
+      conclTxt = `<div class="alert-icon">🔴</div><div class="alert-body"><div class="alert-title">Aluguel de 2 unidades é mais rentável</div>
+        Venda+Aluguel rende ${fmt.money(-diff)} a MENOS por ano. Vender só vale se preciso de liquidez urgente. Tente preço de venda maior.</div>`;
+    }
+    document.getElementById('vaConclusao').className = 'alert ' + conclCls + ' mt-4';
+    document.getElementById('vaConclusao').innerHTML = conclTxt;
+  };
+  window.recalcVA();
+}
+</script>
+</body>
+</html>

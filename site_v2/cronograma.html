@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cronograma — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="cronograma">
+<div id="original-content">
+<div class="page-header">
+  <div class="page-title">📅 Cronograma · Curva S</div>
+  <div class="page-subtitle">180 dias · 6 meses · M01 Maio a M06 Outubro/2026</div>
+</div>
+
+<div class="grid-3">
+  <div class="kpi"><div class="kpi-label">Início Oficial</div><div class="kpi-value" style="font-size:18px;">01/05/2026</div><div class="kpi-delta">quarta-feira</div></div>
+  <div class="kpi accent"><div class="kpi-label">Entrega Prevista</div><div class="kpi-value" style="font-size:18px;">28/10/2026</div><div class="kpi-delta">quarta-feira</div></div>
+  <div class="kpi"><div class="kpi-label">Prazo (com Habite-se)</div><div class="kpi-value">180 dias</div><div class="kpi-delta" id="dpDelta">—</div></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">📈 Curva S — Acumulado Previsto vs Realizado</div></div>
+  <div class="chart-wrap lg"><canvas id="chartCS"></canvas></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><div class="card-title">💵 Desembolso Mensal (R$)</div></div>
+    <div class="chart-wrap"><canvas id="chartMensal"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">% Curva S por Mês</div></div>
+    <div class="chart-wrap"><canvas id="chartPctMes"></canvas></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">Tabela de Cronograma</div></div>
+  <div class="table-wrap">
+    <table id="cronTable">
+      <thead><tr>
+        <th>Mês</th><th class="num">Previsto</th><th class="num">Acumulado Prev.</th>
+        <th class="num">% Prev.</th><th class="num">Realizado</th><th class="num">Acumulado Real.</th><th class="num">% Real.</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>
+function initPage() {
+  const D = window.DATA;
+
+  const t = D.aggregations.tempo;
+  document.getElementById('dpDelta').textContent = t.decorridos + ' dias decorridos · ' + t.restantes + ' restantes';
+
+  const cron = D.cronograma_mensal;
+  const labels = cron.map(m => m.mes);
+
+  new Chart(document.getElementById('chartCS'), {
+    type: 'line',
+    data: { labels,
+      datasets: [
+        { label: 'Previsto Acumulado', data: cron.map(m => m.acum_prev),
+          borderColor: '#1F4E78', borderWidth: 3, tension: 0.3, fill: false, pointRadius: 4 },
+        { label: 'Realizado Acumulado', data: cron.map(m => m.acum_real),
+          borderColor: '#16A34A', borderWidth: 3, tension: 0.3, fill: true, backgroundColor: 'rgba(22,163,74,0.1)', pointRadius: 4 }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' }},
+      scales: { y: { beginAtZero: true, ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' }}}}
+  });
+
+  new Chart(document.getElementById('chartMensal'), {
+    type: 'bar', data: { labels,
+      datasets: [
+        { label: 'Previsto', data: cron.map(m => m.desemb_prev), backgroundColor: '#BDD7EE' },
+        { label: 'Realizado', data: cron.map(m => m.desemb_real), backgroundColor: '#16A34A' }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' }},
+      scales: { y: { beginAtZero: true, ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' }}}}
+  });
+
+  new Chart(document.getElementById('chartPctMes'), {
+    type: 'line', data: { labels,
+      datasets: [
+        { label: '% Prev.', data: cron.map(m => (m.pct_prev*100).toFixed(1)), borderColor: '#1F4E78', borderWidth: 2 },
+        { label: '% Real.', data: cron.map(m => (m.pct_real*100).toFixed(1)), borderColor: '#16A34A', borderWidth: 2 }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }},
+      scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' }}}}
+  });
+
+  document.querySelector('#cronTable tbody').innerHTML = cron.map(m => `<tr>
+    <td><strong>${m.mes}</strong></td>
+    <td class="num">${fmt.money(m.desemb_prev)}</td>
+    <td class="num">${fmt.money(m.acum_prev)}</td>
+    <td class="num">${(m.pct_prev*100).toFixed(1)}%</td>
+    <td class="num text-success text-bold">${fmt.money(m.desemb_real)}</td>
+    <td class="num">${fmt.money(m.acum_real)}</td>
+    <td class="num">${(m.pct_real*100).toFixed(1)}%</td>
+  </tr>`).join('');
+
+}
+</script>
+</body>
+</html>

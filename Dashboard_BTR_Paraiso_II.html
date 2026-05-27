@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard BTR Paraíso II — Monitoramento da Obra</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --primary: #1F4E78;
+  --primary-light: #2E75B6;
+  --accent: #FFC000;
+  --success: #548235;
+  --danger: #C00000;
+  --warning: #BF8F00;
+  --bg: #F7F7F9;
+  --card-bg: #FFFFFF;
+  --border: #E5E7EB;
+  --text: #1F2937;
+  --text-muted: #6B7280;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  padding-bottom: 40px;
+}
+
+/* HEADER */
+.header {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: white;
+  padding: 24px 32px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.header h1 { font-size: 24px; font-weight: 700; }
+.header .subtitle { opacity: 0.85; font-size: 14px; margin-top: 4px; }
+.header .meta {
+  display: flex; gap: 24px; margin-top: 12px; font-size: 13px; flex-wrap: wrap;
+}
+.header .meta span { opacity: 0.85; }
+.header .meta strong { color: white; }
+
+/* CONTAINER */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 32px;
+}
+
+/* KPI GRID */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.kpi {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border-left: 4px solid var(--primary);
+}
+.kpi .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.kpi .value { font-size: 24px; font-weight: 700; color: var(--text); margin-top: 6px; }
+.kpi .delta { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.kpi.primary { border-left-color: var(--primary); }
+.kpi.success { border-left-color: var(--success); }
+.kpi.warning { border-left-color: var(--warning); }
+.kpi.danger { border-left-color: var(--danger); }
+.kpi.accent { border-left-color: var(--accent); }
+
+/* CARDS / SECTIONS */
+.section {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.section h2 {
+  font-size: 17px;
+  color: var(--primary);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid var(--bg);
+  padding-bottom: 10px;
+}
+.section h2 .icon { font-size: 14px; color: var(--text-muted); font-weight: normal; }
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+@media (max-width: 900px) {
+  .grid-2 { grid-template-columns: 1fr; }
+}
+
+/* CHARTS */
+.chart-wrapper { position: relative; height: 320px; }
+.chart-wrapper-small { position: relative; height: 240px; }
+
+/* PROGRESS BAR */
+.progress-bar {
+  background: #E5E7EB;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.progress-bar .fill {
+  background: linear-gradient(90deg, var(--success), #6FAF50);
+  height: 100%;
+  transition: width 0.5s ease;
+}
+.progress-bar .fill.warning { background: linear-gradient(90deg, var(--warning), #FFC000); }
+.progress-bar .fill.danger { background: linear-gradient(90deg, var(--danger), #E55050); }
+
+/* TABLE */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+table thead th {
+  background: var(--bg);
+  text-align: left;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 2px solid var(--border);
+}
+table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+table tbody tr:hover { background: #F9FAFB; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.center { text-align: center; }
+
+/* BADGES */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.badge-gray { background: #F3F4F6; color: #6B7280; }
+.badge-green { background: #DCFCE7; color: #166534; }
+.badge-yellow { background: #FEF3C7; color: #92400E; }
+.badge-red { background: #FEE2E2; color: #991B1B; }
+.badge-blue { background: #DBEAFE; color: #1E40AF; }
+
+/* FILTERS */
+.filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.filter-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text);
+  transition: all 0.15s;
+}
+.filter-btn:hover { background: white; border-color: var(--primary-light); }
+.filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+/* TIMELINE / RDO LIST */
+.rdo-item {
+  border-left: 3px solid var(--primary);
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  background: var(--bg);
+  border-radius: 0 8px 8px 0;
+}
+.rdo-item .rdo-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.rdo-item .rdo-num { font-weight: 700; color: var(--primary); }
+.rdo-item .rdo-meta { font-size: 12px; color: var(--text-muted); }
+.rdo-item .rdo-text { font-size: 13px; color: var(--text); margin-top: 4px; }
+
+/* COMPLIANCE PROGRESS */
+.compliance-stat { display: flex; gap: 8px; margin-bottom: 16px; }
+.compliance-stat .stat { flex: 1; text-align: center; padding: 12px; border-radius: 8px; background: var(--bg); }
+.compliance-stat .stat .n { font-size: 20px; font-weight: 700; }
+.compliance-stat .stat .l { font-size: 11px; color: var(--text-muted); }
+
+/* FOOTER */
+.footer {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 24px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 32px;
+}
+
+/* RESPONSIVE TABLE WRAP */
+.table-wrap { overflow-x: auto; }
+
+/* ICONS */
+.icon-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  font-size: 14px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏗️ BTR Paraíso II — Dashboard de Monitoramento</h1>
+  <div class="subtitle">BTR Paraíso II — Habitação Seriada (2 casas) · Av. B esq. Rua RP-36 (RP-12), Qd 61, Lt 12, Res. Paraíso 2, Senador Canedo/GO</div>
+  <div class="meta">
+    <span>Cliente: <strong>Ercilio de Oliveira</strong></span>
+    <span>RT: <strong>Fabricio de Almeida Vaz · CAU/GO A79329-9</strong></span>
+    <span>Gestor: <strong>Osias Neris Rodrigues Santos</strong></span>
+    <span>Empreiteiro: <strong>Josias Rodrigues Santos · CPF 026.219.851-73</strong></span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi primary">
+      <div class="label">Orçamento Total</div>
+      <div class="value">R$ 431.800,00</div>
+      <div class="delta">154.84 m² · 2 unidades</div>
+    </div>
+    <div class="kpi success">
+      <div class="label">Realizado Acumulado</div>
+      <div class="value">R$ 40.965,17</div>
+      <div class="delta">9.5% do orçamento</div>
+    </div>
+    <div class="kpi warning">
+      <div class="label">Saldo a Realizar</div>
+      <div class="value">R$ 390.834,83</div>
+      <div class="delta">R$ 2.788,69/m² · R$ 215.900,00/unidade</div>
+    </div>
+    <div class="kpi accent">
+      <div class="label">Prazo</div>
+      <div class="value">154 dias</div>
+      <div class="delta">26 / 180 · 9.5_TEMPO%</div>
+    </div>
+    <div class="kpi primary">
+      <div class="label">RDOs Registrados</div>
+      <div class="value">15</div>
+      <div class="delta">Último: #3 em 2026-05-27</div>
+    </div>
+    <div class="kpi danger">
+      <div class="label">Compliance Pendente</div>
+      <div class="value">32</div>
+      <div class="delta">de 32 itens · 0 concluídos</div>
+    </div>
+  </div>
+
+  <!-- CURVA S + FÍSICO/FINANCEIRO -->
+  <div class="grid-2">
+    <div class="section">
+      <h2>📈 Curva S — Previsto vs Realizado <span class="icon">% acumulado</span></h2>
+      <div class="chart-wrapper"><canvas id="chartCurvaS"></canvas></div>
+    </div>
+    <div class="section">
+      <h2>⏱️ Avanço Físico vs Cronograma</h2>
+      <div style="margin-bottom: 20px;">
+        <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;">
+          <span>% Físico-Financeiro</span><strong>9.5%</strong>
+        </div>
+        <div class="progress-bar"><div class="fill warning" style="width: 9.5_WIDTH%"></div></div>
+      </div>
+      <div style="margin-bottom: 20px;">
+        <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;">
+          <span>% Tempo Decorrido</span><strong>9.5_TEMPO%</strong>
+        </div>
+        <div class="progress-bar"><div class="fill " style="width: 9.5_TEMPO_WIDTH%"></div></div>
+      </div>
+      <div style="padding: 12px; background: var(--bg); border-radius: 8px; font-size: 13px; color: var(--text-muted);">
+        <strong style="color:var(--text);">Diagnóstico:</strong><br>
+        ✅ <span style='color:var(--success);font-weight:600;'>NO RITMO:</span> avanço financeiro (9.5%) alinhado com tempo decorrido (14.4%).
+      </div>
+    </div>
+  </div>
+
+  <!-- CURVA ABC + ITENS FORA -->
+  <div class="grid-2">
+    <div class="section">
+      <h2>📊 Curva ABC — Custo por Etapa <span class="icon">orçado vs realizado</span></h2>
+      <div class="filters">
+        <button class="filter-btn active" onclick="filterEtapas('todas')">Todas (20)</button>
+        <button class="filter-btn" onclick="filterEtapas('A')">Classe A (alto)</button>
+        <button class="filter-btn" onclick="filterEtapas('B')">Classe B (médio)</button>
+        <button class="filter-btn" onclick="filterEtapas('C')">Classe C (baixo)</button>
+      </div>
+      <div class="chart-wrapper" style="height: 420px;"><canvas id="chartABC"></canvas></div>
+    </div>
+    <div class="section">
+      <h2>🧱 Itens Fora do Escopo <span class="icon">F1-F7</span></h2>
+      <div class="chart-wrapper-small"><canvas id="chartItensFora"></canvas></div>
+      <div style="margin-top: 12px; font-size: 12px; color: var(--text-muted);">
+        <strong>Total fora:</strong> R$ 54.300,00 · <strong>Realizado:</strong> R$ 3.616,00
+      </div>
+    </div>
+  </div>
+
+  <!-- TABELA ETAPAS -->
+  <div class="section">
+    <h2>📋 Etapas NBR — Detalhamento Completo</h2>
+    <div class="table-wrap">
+      <table id="tableEtapas">
+        <thead>
+          <tr>
+            <th class="center">Cód</th>
+            <th>Etapa</th>
+            <th class="num">Orçado</th>
+            <th class="num">Realizado</th>
+            <th class="num">% Real</th>
+            <th class="num">Saldo</th>
+            <th class="center">ABC</th>
+            <th class="center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+<tr data-abc="C">
+      <td class="center">1</td>
+      <td>Serviços Preliminares</td>
+      <td class="num">R$ 12.000,00</td>
+      <td class="num">R$ 4.530,27</td>
+      <td class="num">37.8%</td>
+      <td class="num">R$ 7.469,73</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">2</td>
+      <td>Movimento de Terra / Fundações</td>
+      <td class="num">R$ 20.000,00</td>
+      <td class="num">R$ 23.618,90</td>
+      <td class="num">118.1%</td>
+      <td class="num">R$ -3.618,90</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-red">⚠ Estouro</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">3</td>
+      <td>Estrutura</td>
+      <td class="num">R$ 40.000,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 40.000,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">4</td>
+      <td>Alvenaria e Vedações</td>
+      <td class="num">R$ 12.000,00</td>
+      <td class="num">R$ 4.200,00</td>
+      <td class="num">35.0%</td>
+      <td class="num">R$ 7.800,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">5</td>
+      <td>Cobertura</td>
+      <td class="num">R$ 30.000,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 30.000,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">6</td>
+      <td>Instalações Hidráulicas</td>
+      <td class="num">R$ 15.000,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 15.000,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">7</td>
+      <td>Instalações Elétricas e Telecom</td>
+      <td class="num">R$ 20.000,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 20.000,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">8</td>
+      <td>Esquadrias</td>
+      <td class="num">R$ 14.500,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 14.500,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">9</td>
+      <td>Revestimentos Internos</td>
+      <td class="num">R$ 7.500,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 7.500,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">10</td>
+      <td>Revestimentos Externos / Fachada</td>
+      <td class="num">R$ 15.000,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 15.000,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">11</td>
+      <td>Pisos e Pavimentações</td>
+      <td class="num">R$ 15.000,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 15.000,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">12</td>
+      <td>Pintura</td>
+      <td class="num">R$ 6.000,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 6.000,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">13</td>
+      <td>Louças e Metais</td>
+      <td class="num">R$ 6.000,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 6.000,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">14</td>
+      <td>Bancadas e Marcenaria</td>
+      <td class="num">R$ 25.000,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 25.000,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">15</td>
+      <td>Forros</td>
+      <td class="num">R$ 15.000,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 15.000,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">16</td>
+      <td>Áreas Externas / Urbanização</td>
+      <td class="num">R$ 20.000,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 20.000,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">17</td>
+      <td>Limpeza Final e Vistoria</td>
+      <td class="num">R$ 7.500,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 7.500,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">18</td>
+      <td>Administração da Obra</td>
+      <td class="num">R$ 60.000,00</td>
+      <td class="num">R$ 5.000,00</td>
+      <td class="num">8.3%</td>
+      <td class="num">R$ 55.000,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">19</td>
+      <td>Encargos Sociais / INSS</td>
+      <td class="num">R$ 7.000,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 7.000,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr data-abc="C">
+      <td class="center">20</td>
+      <td>Imprevistos / Reserva (5-10%)</td>
+      <td class="num">R$ 30.000,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="num">R$ 30.000,00</td>
+      <td class="center"><span class="badge badge-green">C</span></td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ITENS FORA — TABELA -->
+  <div class="section">
+    <h2>🧰 Itens Fora do Escopo — Detalhamento</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="center">Cód</th>
+            <th>Item</th>
+            <th>Descrição</th>
+            <th class="num">Orçado</th>
+            <th class="num">Realizado</th>
+            <th class="num">% Real</th>
+            <th class="center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+<tr>
+      <td class="center"><strong style="color:var(--accent);">F1</strong></td>
+      <td>Gesso (forro liso)</td>
+      <td style="font-size:12px; color:var(--text-muted);">Forro de gesso ~124 m² (baseline SINAPI-GO)</td>
+      <td class="num">R$ 8.500,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr>
+      <td class="center"><strong style="color:var(--accent);">F2</strong></td>
+      <td>Rufos e calhas</td>
+      <td style="font-size:12px; color:var(--text-muted);">Chapa galvanizada para telhado das 2 casas</td>
+      <td class="num">R$ 5.500,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr>
+      <td class="center"><strong style="color:var(--accent);">F3</strong></td>
+      <td>Marcenaria (ajustes)</td>
+      <td style="font-size:12px; color:var(--text-muted);">Ajuste de portas, ferragens, painéis</td>
+      <td class="num">R$ 2.300,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr>
+      <td class="center"><strong style="color:var(--accent);">F4</strong></td>
+      <td>Muros de arrimo</td>
+      <td style="font-size:12px; color:var(--text-muted);">Muro contra desnível. CONTRATO Josias R$7.000 era para Etapa 1+2 (não muro). MO do muro virá de pagto futuro. Baseline ajustado.</td>
+      <td class="num">R$ 5.000,00</td>
+      <td class="num">R$ 3.616,00</td>
+      <td class="num">72.3%</td>
+      <td class="center"><span class="badge badge-yellow">Em andamento</span></td>
+    </tr>
+<tr>
+      <td class="center"><strong style="color:var(--accent);">F5</strong></td>
+      <td>Muros perimetrais e calçadas</td>
+      <td style="font-size:12px; color:var(--text-muted);">Muro de divisa ~65m + calçadas</td>
+      <td class="num">R$ 23.500,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr>
+      <td class="center"><strong style="color:var(--accent);">F6</strong></td>
+      <td>Fossas e sumidouros</td>
+      <td style="font-size:12px; color:var(--text-muted);">Escavação + anéis + tampas (2 conjuntos)</td>
+      <td class="num">R$ 6.000,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+<tr>
+      <td class="center"><strong style="color:var(--accent);">F7</strong></td>
+      <td>Vidraçaria (boxes, espelhos)</td>
+      <td style="font-size:12px; color:var(--text-muted);">4 boxes + espelhos + vidros extras</td>
+      <td class="num">R$ 3.500,00</td>
+      <td class="num">R$ 0,00</td>
+      <td class="num">0.0%</td>
+      <td class="center"><span class="badge badge-gray">No prazo</span></td>
+    </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- RDOs RECENTES -->
+  <div class="grid-2">
+    <div class="section">
+      <h2>📅 RDOs Recentes</h2>
+      <div class="rdo-item">
+      <div class="rdo-header">
+        <span class="rdo-num">RDO #3</span>
+        <span class="rdo-meta">2026-05-27 · Wednesday · <span class="badge badge-green">Aprovado</span></span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+        🌤 Manhã: Claro (Praticável) · Tarde: Claro (Praticável)
+      </div>
+      <div class="rdo-text">CHEGOU AREIA GROSSA. Fazendo impermeabilização do muro de arrimo. Previsão pronto sexta-feira 29/05.</div>
+    </div>
+<div class="rdo-item">
+      <div class="rdo-header">
+        <span class="rdo-num">RDO #2</span>
+        <span class="rdo-meta">2026-05-26 · Tuesday · <span class="badge badge-gray">Em Análise</span></span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+        🌤 Manhã: Claro (Praticável) · Tarde: Claro (Praticável)
+      </div>
+      <div class="rdo-text">Início execução do muro de arrimo (Contrato Sep. Josias R$ 7.000). Equipe Josias + 1 ajudante.</div>
+    </div>
+<div class="rdo-item">
+      <div class="rdo-header">
+        <span class="rdo-num">RDO #1.5</span>
+        <span class="rdo-meta">2026-05-25 · Monday · <span class="badge badge-green">Aprovado</span></span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+        🌤 Manhã: Claro (Praticável) · Tarde: Claro (Praticável)
+      </div>
+      <div class="rdo-text">Compras de domingo para muro de arrimo: Ferramix R$116 (ferramentas/insumos) + Aliança R$390 (lona+Betumax+broxa para impermeabilização). PIX Santander + CC Bradesco. Sem execução em obra (dom).</div>
+    </div>
+<div class="rdo-item">
+      <div class="rdo-header">
+        <span class="rdo-num">RDO #1.25</span>
+        <span class="rdo-meta">2026-05-22 · Friday · <span class="badge badge-green">Aprovado</span></span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+        🌤 Manhã: Claro (Praticável) · Tarde: Claro (Praticável)
+      </div>
+      <div class="rdo-text">DIA DE COMPRAS — pré-obra. Josias pagto parcial R$2500 (Etapa 1+2 svcs), areia/brita Luciano R$5200, madeiras Madeireira Canedão R$1615, cimento WM Cimentos R$1925. Tudo via Santander Pessoal.</div>
+    </div>
+<div class="rdo-item">
+      <div class="rdo-header">
+        <span class="rdo-num">RDO #1</span>
+        <span class="rdo-meta">2026-05-21 · Thursday · <span class="badge badge-green">Aprovado</span></span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+        🌤 Manhã: Claro (Praticável) · Tarde: Claro (Praticável)
+      </div>
+      <div class="rdo-text">Escavação dos buracos da fundação do muro de arrimo executada por João Pedro Souza Sudário (diarista, R$850 PIX Santander). Reclassif. como Etapa 1 pelo investidor.</div>
+    </div>
+<div class="rdo-item">
+      <div class="rdo-header">
+        <span class="rdo-num">RDO #0.5</span>
+        <span class="rdo-meta">2026-05-20 · Wednesday · <span class="badge badge-green">Aprovado</span></span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+        🌤 Manhã: Claro (Praticável) · Tarde: Claro (Praticável)
+      </div>
+      <div class="rdo-text">🚩 INÍCIO OFICIAL DA OBRA. Compra de vergalhão CA-50 + coluna 10mm na Casa Brasileira de Aço R$615,70. CC Bradesco Pessoal.</div>
+    </div>
+<div class="rdo-item">
+      <div class="rdo-header">
+        <span class="rdo-num">RDO #0.25</span>
+        <span class="rdo-meta">2026-05-19 · Tuesday · <span class="badge badge-green">Aprovado</span></span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+        🌤 Manhã: Claro (Praticável) · Tarde: Claro (Praticável)
+      </div>
+      <div class="rdo-text">Pré-obra: compra de arame (Ferramix R$67,60). CC Bradesco Pessoal.</div>
+    </div>
+<div class="rdo-item">
+      <div class="rdo-header">
+        <span class="rdo-num">RDO #0</span>
+        <span class="rdo-meta">2026-05-18 · Monday · <span class="badge badge-green">Aprovado</span></span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+        🌤 Manhã: Claro (Praticável) · Tarde: Claro (Praticável)
+      </div>
+      <div class="rdo-text">Pré-obra: limpeza terreno R$600 (Etapa 1) + DIA DE COMPRAS PESADAS de aço/cimento/material: KMV R$2.580 (40 colunas 5/16), Nossa Casa R$1.194 (30 sacos cimento), Rocha Ferragista R$93 (lig. água), Ferramix R$15,60 (pregos). Total dia: R$ 4.482,60.</div>
+    </div>
+<div class="rdo-item">
+      <div class="rdo-header">
+        <span class="rdo-num">RDO #-1</span>
+        <span class="rdo-meta">2026-05-16 · Saturday · <span class="badge badge-green">Aprovado</span></span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+        🌤 Manhã: Claro (Praticável) · Tarde: Claro (Praticável)
+      </div>
+      <div class="rdo-text">Pré-pré-obra (sáb): Josias R$1.000 (1ª parcela R$7.000 contratado Etapas 1+2) + Wendel Guedson Dias Carlos R$1.200 (Etapa 1). Total dia: R$ 2.200. PIX Santander Pessoal.</div>
+    </div>
+<div class="rdo-item">
+      <div class="rdo-header">
+        <span class="rdo-num">RDO #-2</span>
+        <span class="rdo-meta">2026-05-15 · Friday · <span class="badge badge-green">Aprovado</span></span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+        🌤 Manhã: Claro (Praticável) · Tarde: Claro (Praticável)
+      </div>
+      <div class="rdo-text">Pré-pré-obra (sex): Aluguel de container Brasil Container e Guindastes Ltda R$700 (R$200 deslocamento + R$500 1º mês). PIX Santander.</div>
+    </div>
+    </div>
+    <div class="section">
+      <h2>⚠️ Ocorrências Críticas</h2>
+      <div class="rdo-item" style="border-left-color: var(--danger);">
+      <div class="rdo-header">
+        <span class="rdo-num" style="color: var(--danger);">[Alta] Outro</span>
+        <span class="rdo-meta">RDO #2 · 2026-05-26</span>
+      </div>
+      <div class="rdo-text"><strong>Josias Rodrigues Santos:</strong> RISCO TÉCNICO: muro sem tubo de dreno PVC ø100mm visível. Instalar antes do aterro (Cláusula 4.a Contrato Sep.)</div>
+    </div>
+    </div>
+  </div>
+
+  <!-- COMPLIANCE -->
+  <div class="section">
+    <h2>⚖️ Compliance Jurídico (32 itens)</h2>
+    <div class="compliance-stat">
+      <div class="stat"><div class="n" style="color:var(--danger);">32</div><div class="l">Pendentes</div></div>
+      <div class="stat"><div class="n" style="color:var(--warning);">0</div><div class="l">Em Andamento</div></div>
+      <div class="stat"><div class="n" style="color:var(--success);">0</div><div class="l">Concluídos</div></div>
+      <div class="stat"><div class="n" style="color:var(--text-muted);">0</div><div class="l">N/A</div></div>
+    </div>
+    <div class="filters">
+      <button class="filter-btn active" onclick="filterCompliance('todos')">Todos (32)</button>
+      <button class="filter-btn" onclick="filterCompliance('Pendente')">Pendentes</button>
+      <button class="filter-btn" onclick="filterCompliance('Em Andamento')">Em Andamento</button>
+      <button class="filter-btn" onclick="filterCompliance('Concluído')">Concluídos</button>
+    </div>
+    <div class="table-wrap">
+      <table id="tableCompliance">
+        <thead>
+          <tr>
+            <th>Categoria</th>
+            <th>Item</th>
+            <th>Base Legal</th>
+            <th class="center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Habilitação Técnica</td>
+      <td>ART/RRT do Responsável Técnico (Engenheiro/Arquiteto)</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Lei 5.194/66 (CONFEA); Lei 12.378/10 (CAU)</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Habilitação Técnica</td>
+      <td>ART/RRT por etapa terceirizada (estrutura, hidráulica, elétrica)</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Resolução CONFEA 1.025/09</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Cadastro Obra</td>
+      <td>CNO — Cadastro Nacional de Obras (antiga Matrícula CEI)</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">IN RFB 2.021/21</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Cadastro Obra</td>
+      <td>Alvará de Construção emitido</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Lei municipal Senador Canedo</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Cadastro Obra</td>
+      <td>Projeto aprovado na Prefeitura</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Lei municipal Senador Canedo</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Tributário/Previdenciário</td>
+      <td>Retenção 11% INSS sobre mão de obra terceirizada</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Lei 8.212/91 art. 31; IN RFB 2.110/22</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Tributário/Previdenciário</td>
+      <td>GPS/GFIP/eSocial dos terceirizados em dia</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Lei 8.212/91; Decreto 10.410/20</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Tributário/Previdenciário</td>
+      <td>ISS de empreiteiros recolhido (município obra)</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">LC 116/03</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Trabalhista</td>
+      <td>Contratos de empreitada por escrito (não caracterizar vínculo)</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">CLT art. 3º e 442-B; CC art. 610</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Trabalhista</td>
+      <td>Verificação responsabilidade solidária do dono da obra</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">CLT art. 455; OJ 191 SDI-1 TST</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Trabalhista</td>
+      <td>Verificação registro CTPS / autônomos / MEI dos trabalhadores</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">CLT art. 41; Lei 13.467/17</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Segurança Trabalho</td>
+      <td>PCMAT (se ≥20 trabalhadores) ou PGR (NR-1)</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">NR-18; NR-1 (Port. 6.730/20)</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Segurança Trabalho</td>
+      <td>PCMSO + ASO admissional</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">NR-7</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Segurança Trabalho</td>
+      <td>CIPAMIN/Comissão Interna de Prevenção (se aplicável)</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">NR-18 item 18.33</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Segurança Trabalho</td>
+      <td>EPIs entregues com ficha de controle assinada</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">NR-6</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Segurança Trabalho</td>
+      <td>Ordem de Serviço de Segurança (OS) por função</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">NR-1 item 1.4.1 b)</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Ambiental</td>
+      <td>Licença Ambiental Municipal (se exigida)</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Res. CONAMA 237/97; legislação municipal</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Ambiental</td>
+      <td>Outorga de água/poço (se aplicável)</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Lei 9.433/97 (Estado GO)</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Ambiental</td>
+      <td>Destinação correta de resíduos da construção (RCC)</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Res. CONAMA 307/02 e 348/04</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Ambiental</td>
+      <td>Plano de Gerenciamento de Resíduos da Construção Civil</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Res. CONAMA 448/12</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Contratos</td>
+      <td>Contrato de empreitada com objeto, prazo, preço e multa</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">CC art. 610-626</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Contratos</td>
+      <td>Cláusula de retenção 5-10% para garantia (caução)</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Prática de mercado / CC</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Contratos</td>
+      <td>Cláusula de reajuste vinculada a INCC/IPCA</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Lei 10.192/01 (anualidade)</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Contratos</td>
+      <td>Seguro de Risco de Engenharia (Engineering All Risks)</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Recomendado — CC art. 618 (garantia 5 anos)</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Vizinhança</td>
+      <td>Notificação aos vizinhos / vistoria cautelar</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">CC art. 1.277-1.281</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Vizinhança</td>
+      <td>Tapume e proteção da via pública</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Norma municipal + NR-18</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Final</td>
+      <td>Habite-se / Carta de Habitação</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Lei municipal</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Final</td>
+      <td>Averbação no Cartório de Registro de Imóveis</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Lei 6.015/73</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">Final</td>
+      <td>Atualização IPTU (planta) com nova edificação</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">CTN art. 32</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">BTR Específico</td>
+      <td>Convenção de locação / contratos de locação modelo</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Lei 8.245/91 (Lei do Inquilinato)</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">BTR Específico</td>
+      <td>Garantia contratual locação (caução, fiança, seguro)</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Lei 8.245/91 art. 37</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+<tr data-status="Pendente">
+      <td style="font-size:11px; color:var(--text-muted);">BTR Específico</td>
+      <td>Vistoria de entrada do imóvel (laudo fotográfico)</td>
+      <td style="font-size:11px; font-style:italic; color:var(--text-muted);">Lei 8.245/91</td>
+      <td class="center"><span class="badge badge-red">Pendente</span></td>
+    </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer">
+    Dashboard gerado em 27/05/2026 11:10 · Dados de 00_Planilha_Mestra_BTR_Paraiso_II.xlsx · Auto-contido (não precisa de servidor)<br>
+    Olive Tree Soluções Imobiliarias · CNPJ 57.615.284/0001-48
+  </div>
+
+</div>
+
+<script>
+// =====================================
+// DADOS
+// =====================================
+const DATA = {"meta": {"empreendimento": "BTR Paraíso II — Habitação Seriada (2 casas)", "razao_social": "Olive Tree Soluções Imobiliarias", "nome_fantasia": "Green Olive Construção e Incorporação", "cnpj": "57.615.284/0001-48", "cliente": "Ercilio de Oliveira", "endereco": "Av. B esq. Rua RP-36 (RP-12), Qd 61, Lt 12, Res. Paraíso 2, Senador Canedo/GO", "n_unidades": 2, "area_terreno": 309.77, "area_total": 154.84, "area_casa_1": 83.7, "area_casa_2": 72.35, "investidor": "Ercilio de Oliveira", "procurador": "Osias Neris Rodrigues Santos · CPF 802.942.431-00", "empreiteiro": "Josias Rodrigues Santos · CPF 026.219.851-73", "rt": "Fabricio de Almeida Vaz · CAU/GO A79329-9", "gestor": "Osias Neris Rodrigues Santos", "data_inicio": "2026-05-01", "prazo_alvo_dias": 180, "data_entrega": "2026-10-28", "prazo_teto_dias": 180, "cno": "[preencher após emissão]", "alvara": "[preencher]"}, "kpis": {"orcamento_total": 431800.0, "realizado": 40965.17, "saldo": 390834.83, "pct_fisico": 0.0948707040296433, "custo_unidade": 215900.0, "custo_m2": 2788.68509429088, "total_rdos": 15, "ultimo_rdo": 3, "ultima_data": "2026-05-27"}, "etapas_nbr": [{"cod": "1", "nome": "Serviços Preliminares", "desc": "Limpeza, locação, canteiro, ligações provisórias", "orcado": 12000.0, "realizado": 4530.27, "pct": 0.3775225, "saldo": 7469.73, "abc": "C", "status": "No prazo"}, {"cod": "2", "nome": "Movimento de Terra / Fundações", "desc": "Escavação, sapata/radier, baldrame", "orcado": 20000.0, "realizado": 23618.9, "pct": 1.180945, "saldo": -3618.9, "abc": "C", "status": "⚠ Estouro"}, {"cod": "3", "nome": "Estrutura", "desc": "Pilares, vigas, lajes, escada", "orcado": 40000.0, "realizado": 0.0, "pct": 0.0, "saldo": 40000.0, "abc": "C", "status": "No prazo"}, {"cod": "4", "nome": "Alvenaria e Vedações", "desc": "Tijolo, bloco, vergas, contravergas", "orcado": 12000.0, "realizado": 4200.0, "pct": 0.35, "saldo": 7800.0, "abc": "C", "status": "No prazo"}, {"cod": "5", "nome": "Cobertura", "desc": "Estrutura de madeira/metálica, telhas, calhas", "orcado": 30000.0, "realizado": 0.0, "pct": 0.0, "saldo": 30000.0, "abc": "C", "status": "No prazo"}, {"cod": "6", "nome": "Instalações Hidráulicas", "desc": "Água fria/quente, esgoto, AP, caixa, reservatório", "orcado": 15000.0, "realizado": 0.0, "pct": 0.0, "saldo": 15000.0, "abc": "C", "status": "No prazo"}, {"cod": "7", "nome": "Instalações Elétricas e Telecom", "desc": "Eletrodutos, fiação, quadros, padrão CELG/EQUATORIAL", "orcado": 20000.0, "realizado": 0.0, "pct": 0.0, "saldo": 20000.0, "abc": "C", "status": "No prazo"}, {"cod": "8", "nome": "Esquadrias", "desc": "Portas, janelas, ferragens", "orcado": 14500.0, "realizado": 0.0, "pct": 0.0, "saldo": 14500.0, "abc": "C", "status": "No prazo"}, {"cod": "9", "nome": "Revestimentos Internos", "desc": "Chapisco, emboço, reboco, gesso", "orcado": 7500.0, "realizado": 0.0, "pct": 0.0, "saldo": 7500.0, "abc": "C", "status": "No prazo"}, {"cod": "10", "nome": "Revestimentos Externos / Fachada", "desc": "Textura, pintura externa, elementos decorativos", "orcado": 15000.0, "realizado": 0.0, "pct": 0.0, "saldo": 15000.0, "abc": "C", "status": "No prazo"}, {"cod": "11", "nome": "Pisos e Pavimentações", "desc": "Contrapiso, porcelanato, rodapé", "orcado": 15000.0, "realizado": 0.0, "pct": 0.0, "saldo": 15000.0, "abc": "C", "status": "No prazo"}, {"cod": "12", "nome": "Pintura", "desc": "Selador, massa, pintura interna", "orcado": 6000.0, "realizado": 0.0, "pct": 0.0, "saldo": 6000.0, "abc": "C", "status": "No prazo"}, {"cod": "13", "nome": "Louças e Metais", "desc": "Bacias, cubas, torneiras, registros", "orcado": 6000.0, "realizado": 0.0, "pct": 0.0, "saldo": 6000.0, "abc": "C", "status": "No prazo"}, {"cod": "14", "nome": "Bancadas e Marcenaria", "desc": "Granito, armários planejados", "orcado": 25000.0, "realizado": 0.0, "pct": 0.0, "saldo": 25000.0, "abc": "C", "status": "No prazo"}, {"cod": "15", "nome": "Forros", "desc": "Gesso, PVC, modulado", "orcado": 15000.0, "realizado": 0.0, "pct": 0.0, "saldo": 15000.0, "abc": "C", "status": "No prazo"}, {"cod": "16", "nome": "Áreas Externas / Urbanização", "desc": "Calçada, muro, portão, paisagismo, garagem", "orcado": 20000.0, "realizado": 0.0, "pct": 0.0, "saldo": 20000.0, "abc": "C", "status": "No prazo"}, {"cod": "17", "nome": "Limpeza Final e Vistoria", "desc": "Limpeza pesada, retoques, habite-se", "orcado": 7500.0, "realizado": 0.0, "pct": 0.0, "saldo": 7500.0, "abc": "C", "status": "No prazo"}, {"cod": "18", "nome": "Administração da Obra", "desc": "Mestre Osias, ART/RRT, taxas, alvará, seguros", "orcado": 60000.0, "realizado": 5000.0, "pct": 0.0833333333333333, "saldo": 55000.0, "abc": "C", "status": "No prazo"}, {"cod": "19", "nome": "Encargos Sociais / INSS", "desc": "Retenção 11% sobre MO, FGTS, GRRF, INSS patronal", "orcado": 7000.0, "realizado": 0.0, "pct": 0.0, "saldo": 7000.0, "abc": "C", "status": "No prazo"}, {"cod": "20", "nome": "Imprevistos / Reserva (5-10%)", "desc": "Contingência", "orcado": 30000.0, "realizado": 0.0, "pct": 0.0, "saldo": 30000.0, "abc": "C", "status": "No prazo"}], "itens_fora": [{"cod": "F1", "nome": "Gesso (forro liso)", "desc": "Forro de gesso ~124 m² (baseline SINAPI-GO)", "orcado": 8500.0, "realizado": 0.0, "pct": 0.0, "saldo": 8500.0, "status": "No prazo"}, {"cod": "F2", "nome": "Rufos e calhas", "desc": "Chapa galvanizada para telhado das 2 casas", "orcado": 5500.0, "realizado": 0.0, "pct": 0.0, "saldo": 5500.0, "status": "No prazo"}, {"cod": "F3", "nome": "Marcenaria (ajustes)", "desc": "Ajuste de portas, ferragens, painéis", "orcado": 2300.0, "realizado": 0.0, "pct": 0.0, "saldo": 2300.0, "status": "No prazo"}, {"cod": "F4", "nome": "Muros de arrimo", "desc": "Muro contra desnível. CONTRATO Josias R$7.000 era para Etapa 1+2 (não muro). MO do muro virá de pagto futuro. Baseline ajustado.", "orcado": 5000.0, "realizado": 3616.0, "pct": 0.7232, "saldo": 1384.0, "status": "Em andamento"}, {"cod": "F5", "nome": "Muros perimetrais e calçadas", "desc": "Muro de divisa ~65m + calçadas", "orcado": 23500.0, "realizado": 0.0, "pct": 0.0, "saldo": 23500.0, "status": "No prazo"}, {"cod": "F6", "nome": "Fossas e sumidouros", "desc": "Escavação + anéis + tampas (2 conjuntos)", "orcado": 6000.0, "realizado": 0.0, "pct": 0.0, "saldo": 6000.0, "status": "No prazo"}, {"cod": "F7", "nome": "Vidraçaria (boxes, espelhos)", "desc": "4 boxes + espelhos + vidros extras", "orcado": 3500.0, "realizado": 0.0, "pct": 0.0, "saldo": 3500.0, "status": "No prazo"}], "rdos": [{"numero": 2, "data": "2026-05-26", "dia_semana": "Tuesday", "status": "Em Análise", "clima_manha": "Claro", "cond_manha": "Praticável", "clima_tarde": "Claro", "cond_tarde": "Praticável", "criado_por": "Ercilio de Oliveira", "aprovado_por": "—", "comentario": "Início execução do muro de arrimo (Contrato Sep. Josias R$ 7.000). Equipe Josias + 1 ajudante.", "fotos": "Pasta 05_Fotos/2026-05-26 — 21 fotos"}, {"numero": 3, "data": "2026-05-27", "dia_semana": "Wednesday", "status": "Aprovado", "clima_manha": "Claro", "cond_manha": "Praticável", "clima_tarde": "Claro", "cond_tarde": "Praticável", "criado_por": "Ercilio de Oliveira", "aprovado_por": "Ercilio de Oliveira", "comentario": "CHEGOU AREIA GROSSA. Fazendo impermeabilização do muro de arrimo. Previsão pronto sexta-feira 29/05.", "fotos": "Pasta 05_Fotos/2026-05-27"}, {"numero": 0, "data": "2026-05-18", "dia_semana": "Monday", "status": "Aprovado", "clima_manha": "Claro", "cond_manha": "Praticável", "clima_tarde": "Claro", "cond_tarde": "Praticável", "criado_por": "Ercilio de Oliveira", "aprovado_por": "Ercilio de Oliveira", "comentario": "Pré-obra: limpeza terreno R$600 (Etapa 1) + DIA DE COMPRAS PESADAS de aço/cimento/material: KMV R$2.580 (40 colunas 5/16), Nossa Casa R$1.194 (30 sacos cimento), Rocha Ferragista R$93 (lig. água), Ferramix R$15,60 (pregos). Total dia: R$ 4.482,60.", "fotos": ""}, {"numero": 1, "data": "2026-05-21", "dia_semana": "Thursday", "status": "Aprovado", "clima_manha": "Claro", "cond_manha": "Praticável", "clima_tarde": "Claro", "cond_tarde": "Praticável", "criado_por": "Ercilio de Oliveira", "aprovado_por": "Ercilio de Oliveira", "comentario": "Escavação dos buracos da fundação do muro de arrimo executada por João Pedro Souza Sudário (diarista, R$850 PIX Santander). Reclassif. como Etapa 1 pelo investidor.", "fotos": ""}, {"numero": 1.5, "data": "2026-05-25", "dia_semana": "Monday", "status": "Aprovado", "clima_manha": "Claro", "cond_manha": "Praticável", "clima_tarde": "Claro", "cond_tarde": "Praticável", "criado_por": "Ercilio de Oliveira", "aprovado_por": "Ercilio de Oliveira", "comentario": "Compras de domingo para muro de arrimo: Ferramix R$116 (ferramentas/insumos) + Aliança R$390 (lona+Betumax+broxa para impermeabilização). PIX Santander + CC Bradesco. Sem execução em obra (dom).", "fotos": ""}, {"numero": 1.25, "data": "2026-05-22", "dia_semana": "Friday", "status": "Aprovado", "clima_manha": "Claro", "cond_manha": "Praticável", "clima_tarde": "Claro", "cond_tarde": "Praticável", "criado_por": "Ercilio de Oliveira", "aprovado_por": "Ercilio de Oliveira", "comentario": "DIA DE COMPRAS — pré-obra. Josias pagto parcial R$2500 (Etapa 1+2 svcs), areia/brita Luciano R$5200, madeiras Madeireira Canedão R$1615, cimento WM Cimentos R$1925. Tudo via Santander Pessoal.", "fotos": ""}, {"numero": 0.25, "data": "2026-05-19", "dia_semana": "Tuesday", "status": "Aprovado", "clima_manha": "Claro", "cond_manha": "Praticável", "clima_tarde": "Claro", "cond_tarde": "Praticável", "criado_por": "Ercilio de Oliveira", "aprovado_por": "Ercilio de Oliveira", "comentario": "Pré-obra: compra de arame (Ferramix R$67,60). CC Bradesco Pessoal.", "fotos": ""}, {"numero": 0.5, "data": "2026-05-20", "dia_semana": "Wednesday", "status": "Aprovado", "clima_manha": "Claro", "cond_manha": "Praticável", "clima_tarde": "Claro", "cond_tarde": "Praticável", "criado_por": "Ercilio de Oliveira", "aprovado_por": "Ercilio de Oliveira", "comentario": "🚩 INÍCIO OFICIAL DA OBRA. Compra de vergalhão CA-50 + coluna 10mm na Casa Brasileira de Aço R$615,70. CC Bradesco Pessoal.", "fotos": ""}, {"numero": -1, "data": "2026-05-16", "dia_semana": "Saturday", "status": "Aprovado", "clima_manha": "Claro", "cond_manha": "Praticável", "clima_tarde": "Claro", "cond_tarde": "Praticável", "criado_por": "Ercilio de Oliveira", "aprovado_por": "Ercilio de Oliveira", "comentario": "Pré-pré-obra (sáb): Josias R$1.000 (1ª parcela R$7.000 contratado Etapas 1+2) + Wendel Guedson Dias Carlos R$1.200 (Etapa 1). Total dia: R$ 2.200. PIX Santander Pessoal.", "fotos": ""}, {"numero": -2, "data": "2026-05-15", "dia_semana": "Friday", "status": "Aprovado", "clima_manha": "Claro", "cond_manha": "Praticável", "clima_tarde": "Claro", "cond_tarde": "Praticável", "criado_por": "Ercilio de Oliveira", "aprovado_por": "Ercilio de Oliveira", "comentario": "Pré-pré-obra (sex): Aluguel de container Brasil Container e Guindastes Ltda R$700 (R$200 deslocamento + R$500 1º mês). PIX Santander.", "fotos": ""}, {"numero": -3, "data": "2026-02-01", "dia_semana": "Sunday", "status": "Aprovado", "clima_manha": "", "cond_manha": "", "clima_tarde": "", "cond_tarde": "", "criado_por": "Ercilio de Oliveira", "aprovado_por": "Ercilio de Oliveira", "comentario": "PRÉ-INVESTIMENTO PROJETO: Pagamento do projeto arquitetônico ao Arq. Fabricio de Almeida Vaz (CAU/GO A79329-9). R$5.000 PIX Santander. Projeto aprovado em 05/03/2025 (Análise nº 8.722/2024).", "fotos": ""}, {"numero": -2.5, "data": "2026-05-02", "dia_semana": "Saturday", "status": "Aprovado", "clima_manha": "", "cond_manha": "", "clima_tarde": "", "cond_tarde": "", "criado_por": "Ercilio de Oliveira", "aprovado_por": "Ercilio de Oliveira", "comentario": "🚰⚡ Instalações provisórias canteiro (sáb 02/05): Material Ferraagro R$101,50 + MO Daniela R$150 (hidrômetro) + MO Agnaldo R$250 (padrão energia) = R$501,50. CC Bradesco + PIX Santander.", "fotos": ""}, {"numero": -2.75, "data": "2026-04-28", "dia_semana": "Tuesday", "status": "Aprovado", "clima_manha": "", "cond_manha": "", "clima_tarde": "", "cond_tarde": "", "criado_por": "Ercilio de Oliveira", "aprovado_por": "Ercilio de Oliveira", "comentario": "Pré-pré-obra (ter 28/04): Compra de Caixa de Hidrômetro na Eletroborges R$295,77. PIX Santander Pessoal. Preparação para instalação da ligação provisória de água.", "fotos": ""}, {"numero": -2.65, "data": "2026-04-29", "dia_semana": "Wednesday", "status": "Aprovado", "clima_manha": "", "cond_manha": "", "clima_tarde": "", "cond_tarde": "", "criado_por": "Ercilio de Oliveira", "aprovado_por": "Ercilio de Oliveira", "comentario": "Pré-pré-obra (qua 29/04): Plaquinha de endereço da obra (Lasercor R$40). PIX Santander Pessoal. Necessária para identificação do canteiro/numeração.", "fotos": ""}, {"numero": -2.85, "data": "2026-04-27", "dia_semana": "Monday", "status": "Aprovado", "clima_manha": "", "cond_manha": "", "clima_tarde": "", "cond_tarde": "", "criado_por": "Ercilio de Oliveira", "aprovado_por": "Ercilio de Oliveira", "comentario": "Pré-pré-obra (seg 27/04): Topografia do terreno por Aendson Lázaro Fernandes Severino R$250. PIX Santander Pessoal. Levantamento topográfico essencial para locação da obra.", "fotos": ""}], "atividades_log": [{"rdo": 2, "data": "2026-05-26", "cod": "F4", "etapa": "Muros de arrimo", "status": "Em Execução", "descricao": "Início muro de arrimo: armação ferragens, alvenaria estrutural, lona preta impermeabilizante", "pct": 0.25, "mo": 1750.0, "material": 116.0, "total": 1866.0}, {"rdo": 3, "data": "2026-05-27", "cod": "F4", "etapa": "Muros de arrimo", "status": "Em Execução", "descricao": "Continuação muro de arrimo: chegou areia grossa, fazendo impermeabilização. Previsão pronto sexta 29/05", "pct": 0.25, "mo": 1750.0, "material": 0.0, "total": 1750.0}, {"rdo": 2, "data": "2026-05-26", "cod": "2", "etapa": "Movimento de Terra / Fundações", "status": "A Iniciar", "descricao": "Compra de areia para fundações da casa (Ki Areia · NF a confirmar) — material em estoque, ainda não aplicado", "pct": 0.0, "mo": 0.0, "material": 2200.0, "total": 2200.0}, {"rdo": 0, "data": "2026-05-18", "cod": "1", "etapa": "Serviços Preliminares", "status": "Concluída", "descricao": "Limpeza geral do terreno (corte de mato, retirada de entulho, nivelamento prévio) — pago via PIX Santander", "pct": 1.0, "mo": 600.0, "material": 0.0, "total": 600.0}, {"rdo": 1, "data": "2026-05-21", "cod": "1", "etapa": "Serviços Preliminares", "status": "Concluída", "descricao": "Escavação dos buracos da fundação do muro de arrimo (CORREÇÃO: reclassificada como Etapa 1 Serv. Preliminares pelo investidor). Diarista João Pedro Souza Sudário, PIX Santander Pessoal", "pct": 1.0, "mo": 850.0, "material": 0.0, "total": 850.0}, {"rdo": 1.5, "data": "2026-05-25", "cod": "2", "etapa": "Movimento de Terra / Fundações", "status": "A Iniciar", "descricao": "Material avulso comprado na Ferramix Ltda (ferramentas/insumos para Etapa 2) — PIX Santander Pessoal", "pct": 0.0, "mo": 0.0, "material": 116.0, "total": 116.0}, {"rdo": 1.5, "data": "2026-05-25", "cod": "2", "etapa": "Movimento de Terra / Fundações", "status": "A Iniciar", "descricao": "Material para impermeabilização do muro de arrimo (Aliança Mat. Constr.): LONA preta + BETUMAX (emulsão asfáltica) + BROXA — implementação da recomendação técnica para durabilidade BTR. CC Pessoal Bradesco.", "pct": 0.0, "mo": 0.0, "material": 390.0, "total": 390.0}, {"rdo": 1.25, "data": "2026-05-22", "cod": "2", "etapa": "Movimento de Terra / Fundações", "status": "A Iniciar", "descricao": "Josias Rodrigues Santos — pagto parcial R$2.500 (de R$7.000 total para serviços Etapa 1+2). PIX Santander Pessoal. Empreitada MO.", "pct": 0.0, "mo": 2500.0, "material": 0.0, "total": 2500.0}, {"rdo": 1.25, "data": "2026-05-22", "cod": "2", "etapa": "Movimento de Terra / Fundações", "status": "A Iniciar", "descricao": "Luciano Vieira Lopes — Fornecimento de areia/brita. 1 cam truco areia grossa R$2.200 + 1 cam brita R$2.000 + 1 cam areia média R$1.000 = R$5.200. PIX Santander Pessoal.", "pct": 0.0, "mo": 0.0, "material": 5200.0, "total": 5200.0}, {"rdo": 1.25, "data": "2026-05-22", "cod": "2", "etapa": "Movimento de Terra / Fundações", "status": "A Iniciar", "descricao": "Madeireira Canedão Ltda — tábuas e madeiras para fôrmas/escoramento. 22/05 09:44:15. PIX Santander Pessoal.", "pct": 0.0, "mo": 0.0, "material": 1615.0, "total": 1615.0}, {"rdo": 1.25, "data": "2026-05-22", "cod": "2", "etapa": "Movimento de Terra / Fundações", "status": "A Iniciar", "descricao": "W M Cimentos — cimento. 22/05 07:34:17. PIX Santander Pessoal.", "pct": 0.0, "mo": 0.0, "material": 1925.0, "total": 1925.0}, {"rdo": 1, "data": "2026-05-21", "cod": "2", "etapa": "Movimento de Terra / Fundações", "status": "A Iniciar", "descricao": "Cerâmica Modelo — tijolos. R$8.400 total split 50/50 entre Etapa 2 (R$4.200 aqui) e Etapa 4 (R$4.200 abaixo). 21/05 18:52:23. PIX Santander Pessoal.", "pct": 0.0, "mo": 0.0, "material": 4200.0, "total": 4200.0}, {"rdo": 1, "data": "2026-05-21", "cod": "4", "etapa": "Alvenaria e Vedações", "status": "A Iniciar", "descricao": "Cerâmica Modelo — tijolos (50% do total R$8.400). 21/05 18:52:23. PIX Santander Pessoal.", "pct": 0.0, "mo": 0.0, "material": 4200.0, "total": 4200.0}, {"rdo": 0, "data": "2026-05-18", "cod": "1", "etapa": "Serviços Preliminares", "status": "A Iniciar", "descricao": "Rocha Ferragista — material para ligação provisória de água da obra (Etapa 1 Serv. Preliminares). CC Bradesco Pessoal.", "pct": 0.0, "mo": 0.0, "material": 93.0, "total": 93.0}, {"rdo": 0.5, "data": "2026-05-20", "cod": "2", "etapa": "Movimento de Terra / Fundações", "status": "A Iniciar", "descricao": "Casa Brasileira de Aço Ltda — coluna 10mm + vergalhão CA-50 para fundações. CC Bradesco Pessoal.", "pct": 0.0, "mo": 0.0, "material": 615.7, "total": 615.7}, {"rdo": 0, "data": "2026-05-18", "cod": "2", "etapa": "Movimento de Terra / Fundações", "status": "A Iniciar", "descricao": "KMV Aço e Serviços — 40 unidades de coluna 5/16 para estrutura. CC Bradesco Pessoal.", "pct": 0.0, "mo": 0.0, "material": 2580.0, "total": 2580.0}, {"rdo": 0, "data": "2026-05-18", "cod": "2", "etapa": "Movimento de Terra / Fundações", "status": "A Iniciar", "descricao": "Ferramix — pregos para fôrmas. CC Bradesco Pessoal.", "pct": 0.0, "mo": 0.0, "material": 15.6, "total": 15.6}, {"rdo": 0.25, "data": "2026-05-19", "cod": "2", "etapa": "Movimento de Terra / Fundações", "status": "A Iniciar", "descricao": "Ferramix — fornecimento de arames recozidos para amarração de ferragens. CC Bradesco Pessoal.", "pct": 0.0, "mo": 0.0, "material": 67.6, "total": 67.6}, {"rdo": 0, "data": "2026-05-18", "cod": "2", "etapa": "Movimento de Terra / Fundações", "status": "A Iniciar", "descricao": "Nossa Casa Construção Ltda — 30 sacos de cimento × R$39,90 = R$1.194. CC Bradesco Pessoal.", "pct": 0.0, "mo": 0.0, "material": 1194.0, "total": 1194.0}, {"rdo": -1, "data": "2026-05-16", "cod": "2", "etapa": "Movimento de Terra / Fundações", "status": "A Iniciar", "descricao": "Josias Rodrigues Santos — 1ª parcela R$1.000 do contrato R$7.000 (Etapas 1+2 serviços). PIX 16/05 12:32:37 Santander Pessoal.", "pct": 0.0, "mo": 1000.0, "material": 0.0, "total": 1000.0}, {"rdo": -1, "data": "2026-05-16", "cod": "1", "etapa": "Serviços Preliminares", "status": "Concluída", "descricao": "Wendel Guedson Dias Carlos — serviços Etapa 1 (Serv. Preliminares). PIX 16/05 09:45:01 Santander Pessoal.", "pct": 1.0, "mo": 1200.0, "material": 0.0, "total": 1200.0}, {"rdo": -2, "data": "2026-05-15", "cod": "1", "etapa": "Serviços Preliminares", "status": "Concluída", "descricao": "Brasil Container e Guindastes Ltda — aluguel de container para guarda de materiais/ferramentas no canteiro. R$200 deslocamento + R$500 1º mês aluguel. PIX 15/05 17:03:25.", "pct": 1.0, "mo": 700.0, "material": 0.0, "total": 700.0}, {"rdo": -3, "data": "2026-02-01", "cod": "18", "etapa": "Administração da Obra", "status": "Concluída", "descricao": "Arq. Fabricio de Almeida Vaz (CAU/GO A79329-9) — Projeto Arquitetônico das 2 casas (entregue e aprovado pela prefeitura, Análise nº 8.722/2024 em 05/03/2025). PIX Santander Pessoal.", "pct": 1.0, "mo": 5000.0, "material": 0.0, "total": 5000.0}, {"rdo": -2.5, "data": "2026-05-02", "cod": "1", "etapa": "Serviços Preliminares", "status": "Concluída", "descricao": "Ferraagro — material para instalação do hidrômetro provisório da obra: cimento (R$44) + tijolo (R$12,50) + acessório (R$45) = R$101.50. CC Bradesco Pessoal.", "pct": 1.0, "mo": 0.0, "material": 101.5, "total": 101.5}, {"rdo": -2.5, "data": "2026-05-02", "cod": "1", "etapa": "Serviços Preliminares", "status": "Concluída", "descricao": "Daniela Maria de Carvalho — Mão de obra para instalação do hidrômetro provisório. R$150. PIX Santander Pessoal.", "pct": 1.0, "mo": 150.0, "material": 0.0, "total": 150.0}, {"rdo": -2.5, "data": "2026-05-02", "cod": "1", "etapa": "Serviços Preliminares", "status": "Concluída", "descricao": "Agnaldo Soares Faustino — MO instalação padrão de energia (ligação provisória elétrica para canteiro). R$250. PIX Santander Pessoal.", "pct": 1.0, "mo": 250.0, "material": 0.0, "total": 250.0}, {"rdo": -2.75, "data": "2026-04-28", "cod": "1", "etapa": "Serviços Preliminares", "status": "Concluída", "descricao": "Eletroborges — Caixa de Hidrômetro para ligação provisória de água da obra. PIX Santander Pessoal.", "pct": 1.0, "mo": 0.0, "material": 295.77, "total": 295.77}, {"rdo": -2.65, "data": "2026-04-29", "cod": "1", "etapa": "Serviços Preliminares", "status": "Concluída", "descricao": "Lasercor — Plaquinha de endereço da obra (identificação do canteiro). PIX Santander Pessoal.", "pct": 1.0, "mo": 0.0, "material": 40.0, "total": 40.0}, {"rdo": -2.85, "data": "2026-04-27", "cod": "1", "etapa": "Serviços Preliminares", "status": "Concluída", "descricao": "Aendson Lázaro Fernandes Severino — Topografia do terreno (levantamento topográfico para locação da obra). PIX Santander Pessoal.", "pct": 1.0, "mo": 250.0, "material": 0.0, "total": 250.0}], "mao_obra_log": [{"rdo": 2, "data": "2026-05-26", "funcao": "Pedreiro", "profissional": "Josias Rodrigues Santos", "qtd": 1, "horas": 8, "obs": "Empreiteiro do muro (Contrato Sep.)"}, {"rdo": 2, "data": "2026-05-26", "funcao": "Ajudante", "profissional": "Auxiliar do Josias", "qtd": 1, "horas": 8, "obs": "Aux do Josias — pedir nome"}, {"rdo": 3, "data": "2026-05-27", "funcao": "Pedreiro", "profissional": "Josias Rodrigues Santos", "qtd": 1, "horas": 8, "obs": ""}, {"rdo": 3, "data": "2026-05-27", "funcao": "Ajudante", "profissional": "Auxiliar do Josias", "qtd": 1, "horas": 8, "obs": ""}], "ocorrencias": [{"rdo": 2, "data": "2026-05-26", "tipo": "Outro", "profissional": "Josias Rodrigues Santos", "descricao": "RISCO TÉCNICO: muro sem tubo de dreno PVC ø100mm visível. Instalar antes do aterro (Cláusula 4.a Contrato Sep.)", "severidade": "Alta"}], "cronograma_mensal": [{"mes": "M01", "desemb_prev": 36166.6666666667, "acum_prev": 36166.6666666667, "pct_prev": 0.0958057395143488, "desemb_real": 0.0, "acum_real": 0.0, "pct_real": 0.0}, {"mes": "M02", "desemb_prev": 57166.6666666667, "acum_prev": 93333.3333333333, "pct_prev": 0.247240618101545, "desemb_real": 0.0, "acum_real": 0.0, "pct_real": 0.0}, {"mes": "M03", "desemb_prev": 67666.6666666667, "acum_prev": 161000.0, "pct_prev": 0.426490066225166, "desemb_real": 0.0, "acum_real": 0.0, "pct_real": 0.0}, {"mes": "M04", "desemb_prev": 86916.6666666667, "acum_prev": 247916.666666667, "pct_prev": 0.65673289183223, "desemb_real": 0.0, "acum_real": 0.0, "pct_real": 0.0}, {"mes": "M05", "desemb_prev": 82416.6666666667, "acum_prev": 330333.333333333, "pct_prev": 0.875055187637969, "desemb_real": 0.0, "acum_real": 0.0, "pct_real": 0.0}, {"mes": "M06", "desemb_prev": 47166.6666666667, "acum_prev": 377500.0, "pct_prev": 1.0, "desemb_real": 0.0, "acum_real": 0.0, "pct_real": 0.0}], "compliance": [{"categoria": "Habilitação Técnica", "item": "ART/RRT do Responsável Técnico (Engenheiro/Arquiteto)", "base_legal": "Lei 5.194/66 (CONFEA); Lei 12.378/10 (CAU)", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Habilitação Técnica", "item": "ART/RRT por etapa terceirizada (estrutura, hidráulica, elétrica)", "base_legal": "Resolução CONFEA 1.025/09", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Cadastro Obra", "item": "CNO — Cadastro Nacional de Obras (antiga Matrícula CEI)", "base_legal": "IN RFB 2.021/21", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Cadastro Obra", "item": "Alvará de Construção emitido", "base_legal": "Lei municipal Senador Canedo", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Cadastro Obra", "item": "Projeto aprovado na Prefeitura", "base_legal": "Lei municipal Senador Canedo", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Tributário/Previdenciário", "item": "Retenção 11% INSS sobre mão de obra terceirizada", "base_legal": "Lei 8.212/91 art. 31; IN RFB 2.110/22", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Tributário/Previdenciário", "item": "GPS/GFIP/eSocial dos terceirizados em dia", "base_legal": "Lei 8.212/91; Decreto 10.410/20", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Tributário/Previdenciário", "item": "ISS de empreiteiros recolhido (município obra)", "base_legal": "LC 116/03", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Trabalhista", "item": "Contratos de empreitada por escrito (não caracterizar vínculo)", "base_legal": "CLT art. 3º e 442-B; CC art. 610", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Trabalhista", "item": "Verificação responsabilidade solidária do dono da obra", "base_legal": "CLT art. 455; OJ 191 SDI-1 TST", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Trabalhista", "item": "Verificação registro CTPS / autônomos / MEI dos trabalhadores", "base_legal": "CLT art. 41; Lei 13.467/17", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Segurança Trabalho", "item": "PCMAT (se ≥20 trabalhadores) ou PGR (NR-1)", "base_legal": "NR-18; NR-1 (Port. 6.730/20)", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Segurança Trabalho", "item": "PCMSO + ASO admissional", "base_legal": "NR-7", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Segurança Trabalho", "item": "CIPAMIN/Comissão Interna de Prevenção (se aplicável)", "base_legal": "NR-18 item 18.33", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Segurança Trabalho", "item": "EPIs entregues com ficha de controle assinada", "base_legal": "NR-6", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Segurança Trabalho", "item": "Ordem de Serviço de Segurança (OS) por função", "base_legal": "NR-1 item 1.4.1 b)", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Ambiental", "item": "Licença Ambiental Municipal (se exigida)", "base_legal": "Res. CONAMA 237/97; legislação municipal", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Ambiental", "item": "Outorga de água/poço (se aplicável)", "base_legal": "Lei 9.433/97 (Estado GO)", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Ambiental", "item": "Destinação correta de resíduos da construção (RCC)", "base_legal": "Res. CONAMA 307/02 e 348/04", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Ambiental", "item": "Plano de Gerenciamento de Resíduos da Construção Civil", "base_legal": "Res. CONAMA 448/12", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Contratos", "item": "Contrato de empreitada com objeto, prazo, preço e multa", "base_legal": "CC art. 610-626", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Contratos", "item": "Cláusula de retenção 5-10% para garantia (caução)", "base_legal": "Prática de mercado / CC", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Contratos", "item": "Cláusula de reajuste vinculada a INCC/IPCA", "base_legal": "Lei 10.192/01 (anualidade)", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Contratos", "item": "Seguro de Risco de Engenharia (Engineering All Risks)", "base_legal": "Recomendado — CC art. 618 (garantia 5 anos)", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Vizinhança", "item": "Notificação aos vizinhos / vistoria cautelar", "base_legal": "CC art. 1.277-1.281", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Vizinhança", "item": "Tapume e proteção da via pública", "base_legal": "Norma municipal + NR-18", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Final", "item": "Habite-se / Carta de Habitação", "base_legal": "Lei municipal", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Final", "item": "Averbação no Cartório de Registro de Imóveis", "base_legal": "Lei 6.015/73", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "Final", "item": "Atualização IPTU (planta) com nova edificação", "base_legal": "CTN art. 32", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "BTR Específico", "item": "Convenção de locação / contratos de locação modelo", "base_legal": "Lei 8.245/91 (Lei do Inquilinato)", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "BTR Específico", "item": "Garantia contratual locação (caução, fiança, seguro)", "base_legal": "Lei 8.245/91 art. 37", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}, {"categoria": "BTR Específico", "item": "Vistoria de entrada do imóvel (laudo fotográfico)", "base_legal": "Lei 8.245/91", "obrigatorio": "Sim", "status": "Pendente", "responsavel": ""}], "riscos": [], "fornecedores": [{"data": "2026-05-26", "fornecedor": "Ki Areia", "descricao": "Areia média para fundações (Etapa 2 Mov. Terra/Fundações)", "etapa": "2 - Movimento de Terra / Fundações", "tipo": "Material", "valor_bruto": 2200.0, "status": "Pago"}, {"data": "2026-05-18", "fornecedor": "[Diarista limpeza - a identificar]", "descricao": "Limpeza geral do terreno (corte mato, entulho, nivelamento prévio)", "etapa": "1 - Serviços Preliminares", "tipo": "Mão de Obra", "valor_bruto": 600.0, "status": "Pago"}, {"data": "2026-05-21", "fornecedor": "João Pedro Souza Sudário", "descricao": "Diarista escavação buracos fundação muro arrimo (reclassif. Etapa 1)", "etapa": "1 - Serviços Preliminares", "tipo": "Mão de Obra", "valor_bruto": 850.0, "status": "Pago"}, {"data": "2026-05-25", "fornecedor": "Ferramix Ltda", "descricao": "Material avulso — ferramentas/insumos para Etapa 2", "etapa": "2 - Movimento de Terra / Fundações", "tipo": "Material", "valor_bruto": 116.0, "status": "Pago"}, {"data": "2026-05-25", "fornecedor": "Aliança Material de Construção", "descricao": "Lona preta + Betumax (emulsão asfáltica) + Broxa (impermeabilização muro arrimo)", "etapa": "2 - Movimento de Terra / Fundações", "tipo": "Material", "valor_bruto": 390.0, "status": "Pago"}, {"data": "2026-05-22", "fornecedor": "Josias Rodrigues Santos", "descricao": "MO empreitada — pagto parcial R$2.500 (de R$7.000 total svcs Etapa 1+2)", "etapa": "2 - Movimento de Terra / Fundações", "tipo": "Mão de Obra", "valor_bruto": 2500.0, "status": "Pago"}, {"data": "2026-05-22", "fornecedor": "Luciano Vieira Lopes", "descricao": "Areia grossa (1 truco R$2.200) + Brita (R$2.000) + Areia média (R$1.000) = R$5.200", "etapa": "2 - Movimento de Terra / Fundações", "tipo": "Material", "valor_bruto": 5200.0, "status": "Pago"}, {"data": "2026-05-22", "fornecedor": "Madeireira Canedão Ltda", "descricao": "Tábuas e madeiras (fôrmas/escoramento)", "etapa": "2 - Movimento de Terra / Fundações", "tipo": "Material", "valor_bruto": 1615.0, "status": "Pago"}, {"data": "2026-05-22", "fornecedor": "W M Cimentos", "descricao": "Cimento", "etapa": "2 - Movimento de Terra / Fundações", "tipo": "Material", "valor_bruto": 1925.0, "status": "Pago"}, {"data": "2026-05-21", "fornecedor": "Cerâmica Modelo (50% Etapa 2)", "descricao": "Tijolos — split 50% Etapa 2 / 50% Etapa 4 (total R$8.400 nf)", "etapa": "2 - Movimento de Terra / Fundações", "tipo": "Material", "valor_bruto": 4200.0, "status": "Pago"}, {"data": "2026-05-21", "fornecedor": "Cerâmica Modelo (50% Etapa 4)", "descricao": "Tijolos — split 50% Etapa 2 / 50% Etapa 4 (total R$8.400 nf)", "etapa": "4 - Alvenaria e Vedações", "tipo": "Material", "valor_bruto": 4200.0, "status": "Pago"}, {"data": "2026-05-18", "fornecedor": "Rocha Ferragista", "descricao": "Material para ligação provisória de água da obra", "etapa": "1 - Serviços Preliminares", "tipo": "Material", "valor_bruto": 93.0, "status": "Pago"}, {"data": "2026-05-20", "fornecedor": "Casa Brasileira de Aço Ltda", "descricao": "Coluna 10mm + vergalhão CA-50", "etapa": "2 - Movimento de Terra / Fundações", "tipo": "Material", "valor_bruto": 615.7, "status": "Pago"}, {"data": "2026-05-18", "fornecedor": "KMV Aço e Serviços", "descricao": "Coluna 5/16 — 40 unidades para fundação/estrutura", "etapa": "2 - Movimento de Terra / Fundações", "tipo": "Material", "valor_bruto": 2580.0, "status": "Pago"}, {"data": "2026-05-18", "fornecedor": "Ferramix Ltda", "descricao": "Pregos para fôrmas", "etapa": "2 - Movimento de Terra / Fundações", "tipo": "Material", "valor_bruto": 15.6, "status": "Pago"}, {"data": "2026-05-19", "fornecedor": "Ferramix Ltda", "descricao": "Arames recozidos para amarração de ferragens", "etapa": "2 - Movimento de Terra / Fundações", "tipo": "Material", "valor_bruto": 67.6, "status": "Pago"}, {"data": "2026-05-18", "fornecedor": "Nossa Casa Construção Ltda", "descricao": "Cimento — 30 sacos × R$ 39,90", "etapa": "2 - Movimento de Terra / Fundações", "tipo": "Material", "valor_bruto": 1194.0, "status": "Pago"}, {"data": "2026-05-16", "fornecedor": "Josias Rodrigues Santos", "descricao": "MO empreitada — 1ª parcela R$1.000 (de R$7.000 svcs Etapa 1+2) — Comprovante PIX 16/05 12:32:37", "etapa": "2 - Movimento de Terra / Fundações", "tipo": "Mão de Obra", "valor_bruto": 1000.0, "status": "Pago"}, {"data": "2026-05-16", "fornecedor": "Wendel Guedson Dias Carlos", "descricao": "Serviços Etapa 1 (Serv. Preliminares) — Comprovante PIX 16/05 09:45:01", "etapa": "1 - Serviços Preliminares", "tipo": "Mão de Obra", "valor_bruto": 1200.0, "status": "Pago"}, {"data": "2026-05-15", "fornecedor": "Brasil Container e Guindastes Ltda", "descricao": "Aluguel container canteiro (R$200 deslocamento + R$500 1º mês) — Comprovante PIX 15/05 17:03:25", "etapa": "1 - Serviços Preliminares", "tipo": "Serviço", "valor_bruto": 700.0, "status": "Pago"}, {"data": "2026-02-01", "fornecedor": "Fabricio de Almeida Vaz", "descricao": "Projeto Arquitetônico — 2 casas baixo padrão (Análise prefeitura nº 8.722/2024). RT da obra.", "etapa": "18 - Administração da Obra", "tipo": "Serviço", "valor_bruto": 5000.0, "status": "Pago"}, {"data": "2026-05-02", "fornecedor": "Ferraagro", "descricao": "Material instalação hidrômetro provisório (cimento R$44 + tijolo R$12,50 + R$45 acessório)", "etapa": "1 - Serviços Preliminares", "tipo": "Material", "valor_bruto": 101.5, "status": "Pago"}, {"data": "2026-05-02", "fornecedor": "Daniela Maria de Carvalho", "descricao": "MO instalação hidrômetro provisório", "etapa": "1 - Serviços Preliminares", "tipo": "Mão de Obra", "valor_bruto": 150.0, "status": "Pago"}, {"data": "2026-05-02", "fornecedor": "Agnaldo Soares Faustino", "descricao": "MO instalação padrão de energia (provisório canteiro)", "etapa": "1 - Serviços Preliminares", "tipo": "Mão de Obra", "valor_bruto": 250.0, "status": "Pago"}, {"data": "2026-04-28", "fornecedor": "Eletroborges", "descricao": "Caixa de Hidrômetro para ligação provisória de água da obra", "etapa": "1 - Serviços Preliminares", "tipo": "Material", "valor_bruto": 295.77, "status": "Pago"}, {"data": "2026-04-29", "fornecedor": "Lasercor", "descricao": "Plaquinha de endereço da obra", "etapa": "1 - Serviços Preliminares", "tipo": "Material", "valor_bruto": 40.0, "status": "Pago"}, {"data": "2026-04-27", "fornecedor": "Aendson Lázaro Fernandes Severino", "descricao": "Topografia do terreno (levantamento p/ locação da obra)", "etapa": "1 - Serviços Preliminares", "tipo": "Serviço", "valor_bruto": 250.0, "status": "Pago"}]};
+
+// =====================================
+// CURVA S
+// =====================================
+const cronograma = DATA.cronograma_mensal;
+const labels = cronograma.map(m => m.mes);
+
+new Chart(document.getElementById('chartCurvaS'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: '% Previsto (acumulado)',
+        data: cronograma.map(m => (m.pct_prev*100).toFixed(1)),
+        borderColor: '#1F4E78',
+        backgroundColor: 'rgba(31,78,120,0.1)',
+        borderWidth: 3,
+        tension: 0.3,
+        fill: true,
+      },
+      {
+        label: '% Realizado (acumulado)',
+        data: cronograma.map(m => (m.pct_real*100).toFixed(1)),
+        borderColor: '#548235',
+        backgroundColor: 'rgba(84,130,53,0.1)',
+        borderWidth: 3,
+        tension: 0.3,
+        fill: true,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom' },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.dataset.label}: ${ctx.raw}%`
+        }
+      }
+    },
+    scales: {
+      y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } }
+    }
+  }
+});
+
+// =====================================
+// CURVA ABC
+// =====================================
+let etapasFiltered = DATA.etapas_nbr;
+const ctxABC = document.getElementById('chartABC').getContext('2d');
+let chartABC;
+
+function renderABC() {
+  if (chartABC) chartABC.destroy();
+  chartABC = new Chart(ctxABC, {
+    type: 'bar',
+    data: {
+      labels: etapasFiltered.map(e => e.cod + ' ' + e.nome),
+      datasets: [
+        {
+          label: 'Orçado',
+          data: etapasFiltered.map(e => e.orcado),
+          backgroundColor: '#1F4E78',
+        },
+        {
+          label: 'Realizado',
+          data: etapasFiltered.map(e => e.realizado),
+          backgroundColor: '#548235',
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        x: { beginAtZero: true, ticks: { callback: v => 'R$ ' + (v/1000) + 'k' } }
+      }
+    }
+  });
+}
+renderABC();
+
+function filterEtapas(cls) {
+  document.querySelectorAll('.section:nth-of-type(3) .filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  if (cls === 'todas') etapasFiltered = DATA.etapas_nbr;
+  else etapasFiltered = DATA.etapas_nbr.filter(e => e.abc === cls);
+  renderABC();
+  // Filtrar tabela também
+  document.querySelectorAll('#tableEtapas tbody tr').forEach(tr => {
+    const abc = tr.dataset.abc;
+    if (cls === 'todas' || abc === cls) tr.style.display = '';
+    else tr.style.display = 'none';
+  });
+}
+
+// =====================================
+// ITENS FORA — Doughnut
+// =====================================
+new Chart(document.getElementById('chartItensFora'), {
+  type: 'doughnut',
+  data: {
+    labels: DATA.itens_fora.map(i => i.cod + ' ' + i.nome),
+    datasets: [{
+      data: DATA.itens_fora.map(i => i.orcado),
+      backgroundColor: ['#1F4E78', '#2E75B6', '#5B9BD5', '#9DC3E6', '#BDD7EE', '#FFC000', '#BF8F00'],
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'right', labels: { font: { size: 10 } } },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.label}: R$ ${ctx.raw.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`
+        }
+      }
+    }
+  }
+});
+
+// =====================================
+// COMPLIANCE FILTER
+// =====================================
+function filterCompliance(status) {
+  document.querySelectorAll('.section:last-of-type .filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.querySelectorAll('#tableCompliance tbody tr').forEach(tr => {
+    const s = tr.dataset.status;
+    if (status === 'todos' || s === status) tr.style.display = '';
+    else tr.style.display = 'none';
+  });
+}
+</script>
+
+</body>
+</html>

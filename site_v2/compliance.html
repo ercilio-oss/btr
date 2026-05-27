@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compliance — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="compliance">
+<div id="original-content">
+<div class="page-header">
+  <div class="page-title">⚖️ Compliance Jurídico</div>
+  <div class="page-subtitle">32 itens · ART/RRT · CNO · Alvará · NRs · Tributação · Trabalhista</div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi danger"><div class="kpi-label">Pendentes</div><div class="kpi-value" id="cPend">—</div></div>
+  <div class="kpi warning"><div class="kpi-label">Em Andamento</div><div class="kpi-value" id="cAnd">—</div></div>
+  <div class="kpi success"><div class="kpi-label">Concluídos</div><div class="kpi-value" id="cConcl">—</div></div>
+  <div class="kpi"><div class="kpi-label">N/A</div><div class="kpi-value" id="cNa">—</div></div>
+</div>
+
+<div class="alert alert-danger">
+  <div class="alert-icon">🚨</div>
+  <div class="alert-body">
+    <div class="alert-title">Itens críticos abertos</div>
+    <strong>RRT do RT</strong> expira em 28/08/2026 — renovar com antecedência<br>
+    <strong>CNO</strong> da obra ainda não emitida — bloqueia averbação no cartório<br>
+    <strong>Contratos de empreitada</strong> com Josias (muro de arrimo e Etapa 1+2) ainda não formalizados
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">Checklist Completo</div><div class="card-meta">32 itens</div></div>
+  <div class="filters">
+    <button class="btn active" onclick="filterComp('todos')">Todos (32)</button>
+    <button class="btn" onclick="filterComp('Pendente')">Pendentes</button>
+    <button class="btn" onclick="filterComp('Em Andamento')">Em Andamento</button>
+    <button class="btn" onclick="filterComp('Concluído')">Concluídos</button>
+    <input type="text" id="cBusca" class="input" placeholder="Buscar..." oninput="filterComp(window.currentCFilter || 'todos')" style="margin-left:auto;">
+  </div>
+  <div class="table-wrap">
+    <table id="cTable">
+      <thead><tr><th>Categoria</th><th>Item</th><th>Base Legal</th><th>Obrigatório</th><th>Status</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>function initPage() { const D = window.DATA; 
+  document.getElementById('cPend').textContent = D.aggregations.comp_stats.pendente;
+  document.getElementById('cAnd').textContent = D.aggregations.comp_stats.andamento;
+  document.getElementById('cConcl').textContent = D.aggregations.comp_stats.concluido;
+  document.getElementById('cNa').textContent = D.aggregations.comp_stats.na;
+
+  window.filterComp = (status) => {
+    window.currentCFilter = status;
+    const b = (document.getElementById('cBusca').value || '').toLowerCase();
+    document.querySelectorAll('#page-content .filters .btn').forEach(btn => btn.classList.remove('active'));
+    if (event && event.target && event.target.classList.contains('btn')) event.target.classList.add('active');
+    const list = D.compliance.filter(c => {
+      if (status !== 'todos' && c.status !== status) return false;
+      if (b && !(c.item + ' ' + c.categoria + ' ' + c.base_legal).toLowerCase().includes(b)) return false;
+      return true;
+    });
+    document.querySelector('#cTable tbody').innerHTML = list.map(c => `<tr>
+      <td class="text-xs text-muted">${c.categoria}</td>
+      <td>${c.item}</td>
+      <td class="text-xs" style="font-style:italic; color:var(--text-muted);">${c.base_legal}</td>
+      <td class="center">${c.obrigatorio || '—'}</td>
+      <td>${statusBadge(c.status)}</td>
+    </tr>`).join('');
+  };
+  filterComp('todos');
+ }</script>
+</body>
+</html>

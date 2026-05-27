@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pagamentos — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="pagamentos">
+<div id="original-content">
+<style>
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 8px; }
+.cal-day { background: var(--gray-50); padding: 8px; border-radius: 6px; min-height: 70px; font-size: 11px; position: relative; }
+.cal-day.has-pgto { background: var(--warning-bg); cursor: pointer; }
+.cal-day.has-pgto:hover { background: var(--warning); color: white; }
+.cal-day.today { box-shadow: 0 0 0 2px var(--primary); }
+.cal-day .num { font-weight: 700; font-size: 13px; color: var(--text); }
+.cal-day .val { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+.cal-day.has-pgto .val { font-weight: 600; color: var(--gray-800); }
+.cal-day.weekend { background: var(--gray-100); opacity: 0.7; }
+.cal-month-header { font-size: 16px; font-weight: 700; color: var(--primary); padding: 14px 0 8px; }
+.cal-week-header { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; padding-bottom: 6px; text-align: center; }
+.vencimento-row { padding: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; display: grid; grid-template-columns: 80px 1fr 140px 120px; gap: 12px; align-items: center; }
+.urg-red { border-left: 4px solid var(--danger); }
+.urg-yellow { border-left: 4px solid var(--warning); }
+.urg-green { border-left: 4px solid var(--success); }
+</style>
+<div class="page-header">
+  <div class="page-title">💳 Calendário de Pagamentos</div>
+  <div class="page-subtitle">Vencimentos previstos · semáforo de urgência · gantt-style</div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi danger"><div class="kpi-label">Próx. 7 dias</div><div class="kpi-value" id="kp7">—</div></div>
+  <div class="kpi warning"><div class="kpi-label">Próx. 30 dias</div><div class="kpi-value" id="kp30">—</div></div>
+  <div class="kpi"><div class="kpi-label">Próx. 90 dias</div><div class="kpi-value" id="kp90">—</div></div>
+  <div class="kpi success"><div class="kpi-label">Total Comprometido</div><div class="kpi-value" id="kpTotal">—</div><div class="kpi-delta">contratado + recorrente</div></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">📋 Próximos Vencimentos (ordenados por urgência)</div></div>
+  <div id="vencList"></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">📅 Calendário Visual (próximos 6 meses)</div></div>
+  <div id="calendar"></div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>function initPage() { const D = window.DATA; 
+  // Lista hardcoded de vencimentos futuros (idealmente viria dos dados)
+  const hoje = new Date('2026-05-27');
+  const vencimentos = [
+    {data: '2026-05-29', desc: 'Conclusão muro de arrimo (saldo Josias se concluído)', valor: 0, tipo: 'Marco', urg: 'green'},
+    {data: '2026-06-15', desc: 'Aluguel Container (Brasil Container) - mês 2', valor: 500, tipo: 'Recorrente', urg: 'yellow'},
+    {data: '2026-06-30', desc: 'Saldo R$3.500 Josias (após Etapa 2)', valor: 3500, tipo: 'Por etapa', urg: 'yellow'},
+    {data: '2026-07-15', desc: 'Aluguel Container - mês 3', valor: 500, tipo: 'Recorrente', urg: 'green'},
+    {data: '2026-07-30', desc: 'Material Etapa 3 (Estrutura) - aço CA-50 adicional', valor: 4000, tipo: 'Material', urg: 'yellow'},
+    {data: '2026-08-15', desc: 'Aluguel Container - mês 4', valor: 500, tipo: 'Recorrente', urg: 'green'},
+    {data: '2026-08-28', desc: 'RRT Fabricio (renovação CAU/GO)', valor: 350, tipo: 'Compliance', urg: 'red'},
+    {data: '2026-09-15', desc: 'Aluguel Container - mês 5', valor: 500, tipo: 'Recorrente', urg: 'green'},
+    {data: '2026-09-30', desc: 'Material Etapa 5 (Instalações - PVC + cabos)', valor: 3000, tipo: 'Material', urg: 'green'},
+    {data: '2026-10-15', desc: 'Pintura + Acabamento (Etapa 8)', valor: 5000, tipo: 'Material+MO', urg: 'green'},
+    {data: '2026-10-17', desc: 'Aluguel Container - mês 6 (final)', valor: 500, tipo: 'Recorrente', urg: 'green'},
+    {data: '2026-10-28', desc: '🎯 ENTREGA — Habite-se + averbação cartório', valor: 2000, tipo: 'Final', urg: 'red'},
+  ];
+
+  const hojeStr = hoje.toISOString().split('T')[0];
+  vencimentos.forEach(v => {
+    const dias = Math.ceil((new Date(v.data) - hoje) / (1000*60*60*24));
+    v.dias = dias;
+    if (dias < 0) v.urg = 'green'; // já passou
+    else if (dias <= 7) v.urg = 'red';
+    else if (dias <= 30) v.urg = 'yellow';
+  });
+
+  // KPIs
+  const futuros = vencimentos.filter(v => v.dias >= 0);
+  document.getElementById('kp7').textContent = fmt.money(futuros.filter(v => v.dias <= 7).reduce((s,v) => s + v.valor, 0));
+  document.getElementById('kp30').textContent = fmt.money(futuros.filter(v => v.dias <= 30).reduce((s,v) => s + v.valor, 0));
+  document.getElementById('kp90').textContent = fmt.money(futuros.filter(v => v.dias <= 90).reduce((s,v) => s + v.valor, 0));
+  document.getElementById('kpTotal').textContent = fmt.money(futuros.reduce((s,v) => s + v.valor, 0));
+
+  // Lista de vencimentos
+  document.getElementById('vencList').innerHTML = futuros.sort((a,b) => a.data > b.data ? 1 : -1).map(v => {
+    const dataStr = new Date(v.data).toLocaleDateString('pt-BR');
+    const diasStr = v.dias === 0 ? 'HOJE' : v.dias > 0 ? `em ${v.dias}d` : `há ${-v.dias}d`;
+    return `<div class="vencimento-row urg-${v.urg}">
+      <div><strong>${dataStr}</strong><div class="text-xs text-muted">${diasStr}</div></div>
+      <div>${v.desc}<div class="text-xs text-muted">${v.tipo}</div></div>
+      <div class="num text-bold">${fmt.money(v.valor)}</div>
+      <div>${statusBadge(v.urg === 'red' ? 'Urgente' : v.urg === 'yellow' ? 'Em atenção' : 'Programado')}</div>
+    </div>`;
+  }).join('');
+
+  // Calendário visual (próx 6 meses)
+  const meses = [
+    {label: 'Maio 2026', y: 2026, m: 4},
+    {label: 'Junho 2026', y: 2026, m: 5},
+    {label: 'Julho 2026', y: 2026, m: 6},
+    {label: 'Agosto 2026', y: 2026, m: 7},
+    {label: 'Setembro 2026', y: 2026, m: 8},
+    {label: 'Outubro 2026', y: 2026, m: 9},
+  ];
+  const diasSem = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
+  let calHtml = '';
+  meses.forEach(mes => {
+    const first = new Date(mes.y, mes.m, 1);
+    const last = new Date(mes.y, mes.m + 1, 0);
+    calHtml += `<div class="cal-month-header">${mes.label}</div>`;
+    calHtml += `<div class="cal-week-header">${diasSem.map(d => `<div>${d}</div>`).join('')}</div>`;
+    calHtml += `<div class="cal-grid">`;
+    // Preencher dias vazios antes
+    for (let i = 0; i < first.getDay(); i++) calHtml += `<div></div>`;
+    for (let d = 1; d <= last.getDate(); d++) {
+      const dt = new Date(mes.y, mes.m, d);
+      const dtStr = dt.toISOString().split('T')[0];
+      const pgto = futuros.find(v => v.data === dtStr);
+      const isToday = dtStr === hojeStr;
+      const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
+      const cls = ['cal-day'];
+      if (pgto) cls.push('has-pgto');
+      if (isToday) cls.push('today');
+      if (isWeekend && !pgto) cls.push('weekend');
+      calHtml += `<div class="${cls.join(' ')}" title="${pgto ? pgto.desc + ' - ' + fmt.money(pgto.valor) : ''}">
+        <div class="num">${d}</div>
+        ${pgto ? `<div class="val">R$ ${(pgto.valor/1000).toFixed(1)}k</div>` : ''}
+      </div>`;
+    }
+    calHtml += `</div>`;
+  });
+  document.getElementById('calendar').innerHTML = calHtml;
+ }</script>
+</body>
+</html>

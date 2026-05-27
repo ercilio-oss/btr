@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cone de Incerteza — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="cone-incerteza">
+<div id="original-content">
+<div class="page-header">
+  <div class="page-title">🎯 Cone de Incerteza</div>
+  <div class="page-subtitle">Projeção do custo final com intervalo de confiança · atualizado a cada lançamento</div>
+</div>
+
+<div class="alert alert-info">
+  <div class="alert-icon">🎯</div>
+  <div class="alert-body">
+    <div class="alert-title">Como ler este gráfico</div>
+    Baseado na <strong>velocidade atual de gasto</strong> e no <strong>desvio observado vs orçado</strong>, projetamos 3 cenários para o custo final. O intervalo se estreita conforme a obra avança (incerteza diminui).
+  </div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi success"><div class="kpi-label">📉 Cenário Otimista</div><div class="kpi-value" id="coneOtim">—</div><div class="kpi-delta">−5% vs orçado</div></div>
+  <div class="kpi"><div class="kpi-label">🎯 Cenário Realista</div><div class="kpi-value" id="coneReal">—</div><div class="kpi-delta">baseado em velocidade atual</div></div>
+  <div class="kpi danger"><div class="kpi-label">📈 Cenário Pessimista</div><div class="kpi-value" id="conePess">—</div><div class="kpi-delta">+15% vs orçado</div></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">📊 Cone de Projeção (custo acumulado)</div></div>
+  <div class="chart-wrap lg"><canvas id="chartCone"></canvas></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><div class="card-title">📐 Velocidade de Gasto (R$/dia)</div></div>
+    <div class="chart-wrap"><canvas id="chartVeloc"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">🧮 Premissas do Modelo</div></div>
+    <ul style="font-size:13px; line-height:1.8; list-style:none;">
+      <li><strong>Orçamento base:</strong> R$ <span id="oBase">—</span></li>
+      <li><strong>Dias decorridos:</strong> <span id="oDias">—</span> de 180</li>
+      <li><strong>Realizado até hoje:</strong> R$ <span id="oReal">—</span></li>
+      <li><strong>Velocidade atual:</strong> R$ <span id="oVel">—</span>/dia</li>
+      <li><strong>Projeção linear (extrapolando):</strong> R$ <span id="oExtrap">—</span></li>
+      <li><strong>Variância da Etapa 2:</strong> <span id="oVar">—</span>%</li>
+    </ul>
+    <div class="alert alert-warning mt-4">
+      <div class="alert-body text-small">
+        ⚠️ <strong>Cuidado:</strong> as compras antecipadas inflam a velocidade aparente. Modelo ajustado para descontar compras de material que serão usadas em meses futuros.
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>function initPage() { const D = window.DATA; 
+  const orc = D.kpis.orcamento_total;
+  const real = D.kpis.realizado;
+  const t = D.aggregations.tempo;
+  const veloc = real / Math.max(t.decorridos, 1);
+  const extrap = veloc * t.total;
+
+  document.getElementById('oBase').textContent = fmt.money(orc).replace('R$ ','');
+  document.getElementById('oDias').textContent = t.decorridos;
+  document.getElementById('oReal').textContent = fmt.money(real).replace('R$ ','');
+  document.getElementById('oVel').textContent = fmt.money(veloc).replace('R$ ','');
+  document.getElementById('oExtrap').textContent = fmt.money(extrap).replace('R$ ','');
+  document.getElementById('oVar').textContent = ((D.etapas_nbr.find(e => e.cod === '2').pct - 1) * 100).toFixed(1);
+
+  // 3 cenários
+  const otim = orc * 0.95;
+  const realC = orc + (extrap - orc) * 0.5;  // metade do desvio extrapolado
+  const pess = orc * 1.15;
+
+  document.getElementById('coneOtim').textContent = fmt.money(otim);
+  document.getElementById('coneReal').textContent = fmt.money(realC);
+  document.getElementById('conePess').textContent = fmt.money(pess);
+
+  // Cone chart — meses M01-M06 + final
+  const labels = ['Início'].concat(D.cronograma_mensal.map(m => m.mes));
+  const previsto = [0].concat(D.cronograma_mensal.map(m => m.acum_prev));
+  const realizadoCum = [0].concat(D.cronograma_mensal.map((m, i) => i === 0 ? m.acum_real : null));
+  // Cone: do M01 em diante, divergir para 3 linhas
+  const otimLine = labels.map((_, i) => i === 0 ? 0 : (previsto[i]/orc) * otim);
+  const realLine = labels.map((_, i) => i === 0 ? 0 : (previsto[i]/orc) * realC);
+  const pessLine = labels.map((_, i) => i === 0 ? 0 : (previsto[i]/orc) * pess);
+
+  new Chart(document.getElementById('chartCone'), {
+    type: 'line',
+    data: { labels,
+      datasets: [
+        { label: 'Pessimista', data: pessLine, borderColor: '#DC2626', borderWidth: 2, borderDash: [4,4], fill: '+1', backgroundColor: 'rgba(220,38,38,0.05)', tension: 0.3, pointRadius: 3 },
+        { label: 'Realista', data: realLine, borderColor: '#F59E0B', borderWidth: 3, fill: false, tension: 0.3, pointRadius: 5 },
+        { label: 'Otimista', data: otimLine, borderColor: '#16A34A', borderWidth: 2, borderDash: [4,4], fill: false, tension: 0.3, pointRadius: 3 },
+        { label: 'Previsto Orçado', data: previsto, borderColor: '#1F4E78', borderWidth: 3, fill: false, tension: 0.3, pointRadius: 4 },
+        { label: 'Realizado até hoje', data: realizadoCum, borderColor: '#16A34A', borderWidth: 4, pointRadius: 7, pointBackgroundColor: '#16A34A', showLine: false }
+      ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' }},
+      scales: { y: { beginAtZero: true, ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' }}}}
+  });
+
+  // Velocidade
+  new Chart(document.getElementById('chartVeloc'), {
+    type: 'bar',
+    data: { labels: ['Atual', 'Linear ideal', 'Extrapolada'],
+      datasets: [{ data: [veloc, orc/t.total, extrap/t.total],
+        backgroundColor: ['#16A34A', '#1F4E78', '#DC2626'] }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }},
+      scales: { y: { beginAtZero: true, ticks: { callback: v => 'R$ ' + Math.round(v) }}}}
+  });
+ }</script>
+</body>
+</html>

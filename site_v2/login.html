@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css">
+<style>
+  body { background: linear-gradient(135deg, #1F4E78 0%, #2c6ba5 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; font-family: 'Inter', sans-serif; }
+  .login-card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 420px; width: 90%; }
+  .login-logo { width: 60px; height: 60px; background: #1F4E78; color: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; margin: 0 auto 16px; }
+  .login-title { text-align: center; margin: 0 0 8px; color: #1F2937; font-size: 24px; font-weight: 700; }
+  .login-sub { text-align: center; color: #6B7280; margin: 0 0 24px; font-size: 14px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px; }
+  .form-group input { width: 100%; padding: 11px 14px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
+  .form-group input:focus { outline: none; border-color: #1F4E78; box-shadow: 0 0 0 3px rgba(31,78,120,0.1); }
+  .btn-primary { width: 100%; padding: 12px; background: #1F4E78; color: white; border: none; border-radius: 8px; font-weight: 600; font-size: 15px; cursor: pointer; }
+  .btn-primary:hover { background: #163a5c; }
+  .btn-primary:disabled { background: #9CA3AF; cursor: not-allowed; }
+  .toggle-link { text-align: center; margin-top: 16px; font-size: 13px; color: #6B7280; }
+  .toggle-link a { color: #1F4E78; font-weight: 500; text-decoration: none; cursor: pointer; }
+  .alert-error { background: #FEF2F2; border-left: 3px solid #DC2626; padding: 10px 12px; border-radius: 6px; color: #991B1B; font-size: 13px; margin-bottom: 14px; }
+  .alert-success { background: #F0FDF4; border-left: 3px solid #16A34A; padding: 10px 12px; border-radius: 6px; color: #14532D; font-size: 13px; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div class="login-card">
+  <div class="login-logo">B</div>
+  <h1 class="login-title" id="formTitle">Entrar</h1>
+  <p class="login-sub" id="formSub">BTR Paraíso II · Olive Tree Soluções Imobiliarias</p>
+
+  <div id="msg"></div>
+
+  <form id="authForm">
+    <div class="form-group">
+      <label for="email">E-mail</label>
+      <input type="email" id="email" autocomplete="email" required>
+    </div>
+    <div class="form-group">
+      <label for="password">Senha</label>
+      <input type="password" id="password" autocomplete="current-password" required minlength="6">
+    </div>
+    <button type="submit" class="btn-primary" id="submitBtn">Entrar</button>
+  </form>
+
+  <div class="toggle-link">
+    <span id="toggleText">Não tem conta?</span>
+    <a id="toggleBtn">Criar conta</a>
+  </div>
+</div>
+
+<script src="/assets/supabase-client.js"></script>
+<script>
+document.addEventListener('supabase-ready', () => {
+  const form = document.getElementById('authForm');
+  const msg = document.getElementById('msg');
+  const formTitle = document.getElementById('formTitle');
+  const submitBtn = document.getElementById('submitBtn');
+  const toggleText = document.getElementById('toggleText');
+  const toggleBtn = document.getElementById('toggleBtn');
+
+  let isSignup = false;
+
+  toggleBtn.onclick = (e) => {
+    e.preventDefault();
+    isSignup = !isSignup;
+    formTitle.textContent = isSignup ? 'Criar conta' : 'Entrar';
+    submitBtn.textContent = isSignup ? 'Criar conta' : 'Entrar';
+    toggleText.textContent = isSignup ? 'Já tem conta?' : 'Não tem conta?';
+    toggleBtn.textContent = isSignup ? 'Entrar' : 'Criar conta';
+    msg.innerHTML = '';
+  };
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    submitBtn.textContent = isSignup ? 'Criando...' : 'Entrando...';
+    msg.innerHTML = '';
+
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    try {
+      let result;
+      if (isSignup) {
+        result = await window.supabase.auth.signUp({ email, password });
+        if (result.error) throw result.error;
+        msg.innerHTML = '<div class="alert-success">Conta criada! Verifique seu e-mail (se necessário) e faça login.</div>';
+        isSignup = false;
+        formTitle.textContent = 'Entrar';
+        submitBtn.textContent = 'Entrar';
+        toggleText.textContent = 'Não tem conta?';
+        toggleBtn.textContent = 'Criar conta';
+      } else {
+        result = await window.supabase.auth.signInWithPassword({ email, password });
+        if (result.error) throw result.error;
+        const params = new URLSearchParams(window.location.search);
+        const next = params.get('next') || '/';
+        window.location.href = next;
+        return;
+      }
+    } catch (err) {
+      msg.innerHTML = '<div class="alert-error">' + (err.message || 'Erro desconhecido') + '</div>';
+    } finally {
+      submitBtn.disabled = false;
+      if (!isSignup) submitBtn.textContent = 'Entrar';
+      else submitBtn.textContent = 'Criar conta';
+    }
+  };
+});
+</script>
+</body>
+</html>

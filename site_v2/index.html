@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="dashboard">
+<div id="original-content">
+<div class="page-header">
+  <div class="page-title">📊 Dashboard</div>
+  <div class="page-subtitle">Visão geral da obra · atualizada automaticamente</div>
+</div>
+
+<div id="diagnosticAlert"></div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-label">Orçamento Total</div><div class="kpi-value" id="kpiOrc">—</div><div class="kpi-delta" id="kpiOrcDelta">—</div></div>
+  <div class="kpi success"><div class="kpi-label">Realizado</div><div class="kpi-value" id="kpiReal">—</div><div class="kpi-delta" id="kpiRealDelta">—</div></div>
+  <div class="kpi warning"><div class="kpi-label">Saldo</div><div class="kpi-value" id="kpiSaldo">—</div><div class="kpi-delta" id="kpiSaldoDelta">—</div></div>
+  <div class="kpi accent"><div class="kpi-label">Prazo</div><div class="kpi-value" id="kpiPrazo">—</div><div class="kpi-delta" id="kpiPrazoDelta">—</div></div>
+  <div class="kpi"><div class="kpi-label">RDOs</div><div class="kpi-value" id="kpiRDOs">—</div><div class="kpi-delta" id="kpiRDOsDelta">—</div></div>
+  <div class="kpi danger"><div class="kpi-label">Etapas em Estouro</div><div class="kpi-value" id="kpiEstouro">—</div><div class="kpi-delta">acima de 100% do orçado</div></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><div class="card-title">📈 Curva S — Previsto × Realizado</div><div class="card-meta">% acumulado</div></div>
+    <div class="chart-wrap"><canvas id="chartCurvaS"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">⏱️ Avanço × Tempo</div></div>
+    <div class="mb-4">
+      <div class="flex-between mb-2 text-small"><span>% Físico-Financeiro</span><strong id="pcFisLabel">—</strong></div>
+      <div class="progress"><div class="progress-fill" id="pbFis"></div></div>
+    </div>
+    <div class="mb-4">
+      <div class="flex-between mb-2 text-small"><span>% Tempo Decorrido</span><strong id="pcTempoLabel">—</strong></div>
+      <div class="progress"><div class="progress-fill" style="background:var(--primary-light)" id="pbTempo"></div></div>
+    </div>
+    <div id="diagPosition" class="alert alert-info" style="margin-bottom:0;"></div>
+  </div>
+</div>
+
+<div class="grid-3">
+  <div class="card">
+    <div class="card-header"><div class="card-title">💼 Composição por Tipo</div></div>
+    <div class="chart-wrap sm"><canvas id="chartTipo"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">🏦 Por Conta de Pagamento</div></div>
+    <div class="chart-wrap sm"><canvas id="chartContas"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">🎯 Ações Críticas</div><div class="card-meta" id="acoesCount">—</div></div>
+    <div id="acoesList" style="font-size:13px;"></div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><div class="card-title">📅 Últimos RDOs</div><a href="/rdos.html" class="text-small text-muted">ver todos →</a></div>
+    <div class="timeline" id="recentRdos"></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">⚠️ Ocorrências</div><a href="/riscos.html" class="text-small text-muted">ver todas →</a></div>
+    <div id="ocoList"></div>
+  </div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>
+function initPage() {
+  const D = window.DATA;
+
+  // KPIs
+  document.getElementById('kpiOrc').textContent = fmt.money(D.kpis.orcamento_total);
+  document.getElementById('kpiOrcDelta').textContent = D.meta.n_unidades + ' unidades · ' + D.meta.area_total + ' m²';
+  document.getElementById('kpiReal').textContent = fmt.money(D.kpis.realizado);
+  document.getElementById('kpiRealDelta').textContent = (D.kpis.pct_fisico*100).toFixed(1) + '% do orçamento';
+  document.getElementById('kpiSaldo').textContent = fmt.money(D.kpis.saldo);
+  document.getElementById('kpiSaldoDelta').textContent = fmt.money(D.kpis.saldo/154.84) + '/m²';
+  const t = D.aggregations.tempo;
+  document.getElementById('kpiPrazo').textContent = t.restantes + ' dias';
+  document.getElementById('kpiPrazoDelta').textContent = t.decorridos + '/' + t.total + ' dias · ' + (t.pct_tempo*100).toFixed(1) + '% decorrido';
+  document.getElementById('kpiRDOs').textContent = D.kpis.total_rdos;
+  document.getElementById('kpiRDOsDelta').textContent = 'Último: #' + D.kpis.ultimo_rdo + ' em ' + D.kpis.ultima_data;
+  document.getElementById('kpiEstouro').textContent = D.aggregations.n_estouro;
+
+  // Progress
+  const pf = D.kpis.pct_fisico * 100;
+  const pt = t.pct_tempo * 100;
+  document.getElementById('pcFisLabel').textContent = pf.toFixed(1) + '%';
+  document.getElementById('pcTempoLabel').textContent = pt.toFixed(1) + '%';
+  const pbFis = document.getElementById('pbFis');
+  pbFis.style.width = Math.min(pf, 100) + '%';
+  if (pf < pt - 10) pbFis.classList.add('danger');
+  else if (pf < pt) pbFis.classList.add('warning');
+  document.getElementById('pbTempo').style.width = Math.min(pt, 100) + '%';
+
+  // Diagnostic alert
+  const diag = document.getElementById('diagnosticAlert');
+  let alertCls, alertIcon, alertTxt;
+  if (pf < pt - 10) {
+    alertCls = 'alert-danger'; alertIcon = '🔴';
+    alertTxt = `<div class="alert-title">Obra atrasada em valor</div>Avanço financeiro (${pf.toFixed(1)}%) está abaixo do tempo decorrido (${pt.toFixed(1)}%). Acelerar execução ou justificar.`;
+  } else if (pf < pt + 5) {
+    alertCls = 'alert-success'; alertIcon = '✅';
+    alertTxt = `<div class="alert-title">Obra no ritmo</div>Avanço financeiro (${pf.toFixed(1)}%) alinhado com tempo decorrido (${pt.toFixed(1)}%).`;
+  } else {
+    alertCls = 'alert-warning'; alertIcon = '⚠️';
+    alertTxt = `<div class="alert-title">Investimento adiantado</div>Gasto (${pf.toFixed(1)}%) acima do tempo decorrido (${pt.toFixed(1)}%). Verificar materiais em estoque.`;
+  }
+  diag.innerHTML = `<div class="alert ${alertCls}"><div class="alert-icon">${alertIcon}</div><div class="alert-body">${alertTxt}</div></div>`;
+
+  document.getElementById('diagPosition').innerHTML = `<div class="alert-body text-small"><strong>Posição:</strong> ${pf < pt - 10 ? 'Atrasada' : pf < pt + 5 ? 'No ritmo' : 'Investimento adiantado'} — diferença ${(pt-pf).toFixed(1)} p.p.</div>`;
+
+  // Curva S
+  new Chart(document.getElementById('chartCurvaS'), {
+    type: 'line',
+    data: {
+      labels: D.cronograma_mensal.map(m => m.mes),
+      datasets: [
+        { label: '% Previsto', data: D.cronograma_mensal.map(m => (m.pct_prev*100).toFixed(1)),
+          borderColor: '#1F4E78', backgroundColor: 'rgba(31,78,120,0.1)', borderWidth: 3, tension: 0.3, fill: true },
+        { label: '% Realizado', data: D.cronograma_mensal.map(m => (m.pct_real*100).toFixed(1)),
+          borderColor: '#16A34A', backgroundColor: 'rgba(22,163,74,0.1)', borderWidth: 3, tension: 0.3, fill: true }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' }},
+      scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' }}}}
+  });
+
+  // Composição por tipo
+  const tt = D.aggregations.totais_tipo;
+  new Chart(document.getElementById('chartTipo'), {
+    type: 'doughnut',
+    data: { labels: ['Material', 'Mão de Obra', 'Serviço'],
+      datasets: [{ data: [tt.material, tt.mo, tt.servico],
+        backgroundColor: ['#1F4E78', '#FFC000', '#16A34A'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }}}
+  });
+
+  // Contas
+  const contas = D.aggregations.contas;
+  new Chart(document.getElementById('chartContas'), {
+    type: 'doughnut',
+    data: { labels: Object.keys(contas),
+      datasets: [{ data: Object.values(contas),
+        backgroundColor: ['#DC2626', '#2E75B6', '#FFC000', '#16A34A', '#6B7280'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }}}
+  });
+
+  // Ações críticas
+  const acoes = [
+    { icon: '🔴', text: 'Etapa 2 em estouro (118%) — reorçamento sugerido R$ 32k', priority: 'danger' },
+    { icon: '⚠️', text: 'Dreno PVC do muro arrimo antes do aterro (sexta 29/05)', priority: 'warning' },
+    { icon: '⚖️', text: 'Renovar RRT do Fabricio até 28/08/2026', priority: 'warning' },
+    { icon: '📋', text: 'Formalizar Contrato Sep. Muro de Arrimo (Josias)', priority: 'warning' },
+    { icon: '💸', text: 'Contrato de Mútuo PF→PJ (R$ 40k já transitados)', priority: 'warning' },
+  ];
+  document.getElementById('acoesCount').textContent = acoes.length + ' itens';
+  document.getElementById('acoesList').innerHTML = acoes.map(a =>
+    `<div style="padding:8px 0; border-bottom:1px solid var(--gray-100); display:flex; gap:8px;">
+       <span>${a.icon}</span><span>${a.text}</span></div>`).join('');
+
+  // Recent RDOs
+  const recRdos = [...D.rdos].sort((a,b) => a.data > b.data ? -1 : 1).slice(0, 5);
+  document.getElementById('recentRdos').innerHTML = recRdos.map(r => `
+    <div class="timeline-item">
+      <div class="timeline-date">RDO #${r.numero} · ${fmt.date(r.data)} · ${r.dia_semana || ''}</div>
+      <div class="timeline-title">${r.status} ${statusBadge(r.status)}</div>
+      <div class="timeline-desc">${r.comentario ? r.comentario.substring(0, 180) + (r.comentario.length > 180 ? '...' : '') : '—'}</div>
+    </div>`).join('');
+
+  // Ocorrências
+  const oco = document.getElementById('ocoList');
+  if (D.ocorrencias.length === 0) {
+    oco.innerHTML = '<p class="text-muted text-small">Nenhuma ocorrência registrada.</p>';
+  } else {
+    oco.innerHTML = D.ocorrencias.map(o => `
+      <div style="padding:10px; background:var(--gray-50); border-radius:6px; margin-bottom:8px; border-left:3px solid var(--danger);">
+        <div class="text-xs text-muted">RDO #${o.rdo} · ${o.data} ${severidadeBadge(o.severidade)}</div>
+        <div class="text-bold mt-3" style="margin-top:4px;">${o.tipo}</div>
+        <div class="text-small text-muted">${o.descricao}</div>
+      </div>`).join('');
+  }
+
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financeiro — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="financeiro">
+<div id="original-content">
+<div class="page-header">
+  <div class="page-title">💰 Financeiro</div>
+  <div class="page-subtitle">Fluxo de caixa · projeção · contas a pagar</div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-label">Pré-Obra</div><div class="kpi-value" id="kpiPreObra">—</div><div class="kpi-delta">Antes do início oficial</div></div>
+  <div class="kpi success"><div class="kpi-label">Maio (M01)</div><div class="kpi-value" id="kpiM01">—</div><div class="kpi-delta" id="kpiM01D">—</div></div>
+  <div class="kpi warning"><div class="kpi-label">A Desembolsar</div><div class="kpi-value" id="kpiADesemb">—</div><div class="kpi-delta">Junho a Outubro</div></div>
+  <div class="kpi danger"><div class="kpi-label">PF→PJ não documentado</div><div class="kpi-value" id="kpiPFPJ">—</div><div class="kpi-delta">Necessita Contrato de Mútuo</div></div>
+</div>
+
+<div class="alert alert-warning">
+  <div class="alert-icon">💸</div>
+  <div class="alert-body">
+    <div class="alert-title">100% pago via contas pessoais (Santander PIX + Bradesco CC)</div>
+    Risco fiscal: documentar como Contrato de Mútuo Sócio→Empresa para reembolso futuro pela Green Olive, ou registrar como aporte de capital. Sem isso, valores podem ser tributados como "renda" ou "doação à empresa".
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><div class="card-title">📈 Curva S — Acumulado</div></div>
+    <div class="chart-wrap"><canvas id="finCS"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">📊 Desembolso Mensal</div></div>
+    <div class="chart-wrap"><canvas id="finMensal"></canvas></div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><div class="card-title">🏦 Distribuição por Conta</div></div>
+    <div class="chart-wrap"><canvas id="finConta"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">💼 Por Tipo de Despesa</div></div>
+    <div class="chart-wrap"><canvas id="finTipo"></canvas></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">📋 Próximos Vencimentos</div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Item</th><th>Periodicidade</th><th class="num">Valor</th><th>Próximo vencimento</th></tr></thead>
+      <tbody>
+        <tr><td>Aluguel Container (Brasil Container)</td><td>Mensal</td><td class="num">R$ 500,00</td><td>15/06/2026</td></tr>
+        <tr><td>Saldo Josias (R$7k - R$3,5k pagos)</td><td>Por etapa</td><td class="num">R$ 3.500,00</td><td>após conclusão Etapa 2</td></tr>
+        <tr><td>RRT Fabricio (renovação)</td><td>Único</td><td class="num">~R$ 300,00</td><td>antes 28/08/2026</td></tr>
+        <tr><td>Tijolos restantes (Cerâmica Modelo - já pago)</td><td>—</td><td class="num">R$ 0,00</td><td>—</td></tr>
+        <tr><td>Aço para Estrutura (Etapa 3)</td><td>Único</td><td class="num">~R$ 4.000,00</td><td>Jun/2026</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>function initPage() { const D = window.DATA; 
+  // Pre-obra: lançamentos antes de 01/05/2026
+  const preObra = D.atividades_log.filter(a => a.data < '2026-05-01').reduce((s,a) => s + a.total, 0);
+  document.getElementById('kpiPreObra').textContent = fmt.money(preObra);
+  const m01 = D.cronograma_mensal[0];
+  document.getElementById('kpiM01').textContent = fmt.money(m01.desemb_real);
+  document.getElementById('kpiM01D').textContent = 'de ' + fmt.money(m01.desemb_prev) + ' previsto';
+  document.getElementById('kpiADesemb').textContent = fmt.money(D.kpis.saldo);
+  // PF->PJ = todo o realizado é via PF
+  document.getElementById('kpiPFPJ').textContent = fmt.money(D.kpis.realizado);
+
+  const cron = D.cronograma_mensal;
+  new Chart(document.getElementById('finCS'), {
+    type: 'line', data: { labels: cron.map(m => m.mes),
+      datasets: [
+        { label: 'Previsto', data: cron.map(m => m.acum_prev), borderColor: '#1F4E78', borderWidth: 3, tension: 0.3, fill: false },
+        { label: 'Realizado', data: cron.map(m => m.acum_real), borderColor: '#16A34A', borderWidth: 3, tension: 0.3, fill: true, backgroundColor: 'rgba(22,163,74,0.1)' }
+      ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' }},
+      scales: { y: { beginAtZero: true, ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' }}}}
+  });
+
+  new Chart(document.getElementById('finMensal'), {
+    type: 'bar', data: { labels: cron.map(m => m.mes),
+      datasets: [
+        { label: 'Previsto', data: cron.map(m => m.desemb_prev), backgroundColor: '#BDD7EE' },
+        { label: 'Realizado', data: cron.map(m => m.desemb_real), backgroundColor: '#16A34A' }
+      ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' }},
+      scales: { y: { beginAtZero: true, ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' }}}}
+  });
+
+  const contas = D.aggregations.contas;
+  new Chart(document.getElementById('finConta'), {
+    type: 'doughnut', data: { labels: Object.keys(contas),
+      datasets: [{ data: Object.values(contas), backgroundColor: ['#DC2626', '#2E75B6', '#FFC000', '#16A34A', '#6B7280'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }}}
+  });
+
+  const tt = D.aggregations.totais_tipo;
+  new Chart(document.getElementById('finTipo'), {
+    type: 'doughnut', data: { labels: ['Material', 'Mão de Obra', 'Serviço'],
+      datasets: [{ data: [tt.material, tt.mo, tt.servico], backgroundColor: ['#1F4E78', '#FFC000', '#16A34A'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }}}
+  });
+ }</script>
+</body>
+</html>

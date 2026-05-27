@@ -1,0 +1,45 @@
+# Sistema
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Dependências
+node_modules/
+.npm/
+
+# Build artifacts
+netlify_build/
+.netlify/
+
+# Dados sensíveis (privados, NÃO publicar mesmo em repo privado)
+02_Custos/*.xlsx
+02_Custos/*.xlsm
+02_Custos/backup_*/
+05_Fotos/
+06_Contratos/
+07_Relatorios_Investidor/
+recibos_e_notas/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+
+# Env (segredos do Supabase ficam no Netlify, NÃO no repo)
+.env
+.env.local
+.env.*.local
+*.env
+
+# Caches
+__pycache__/
+*.pyc
+.cache/
+
+# OS específico
+.Trash/
+ehthumbs.db

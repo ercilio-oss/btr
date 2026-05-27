@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vista Mobile — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="mobile">
+<div id="original-content">
+<style>
+.mobile-frame {
+  max-width: 380px; margin: 0 auto;
+  background: white; border-radius: 24px; padding: 0;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  border: 8px solid #1F2937;
+  overflow: hidden;
+}
+.mobile-status {
+  background: #1F2937; color: white; padding: 8px 14px;
+  display: flex; justify-content: space-between; font-size: 11px;
+}
+.mobile-content { padding: 14px; max-height: 580px; overflow-y: auto; }
+.m-card { background: var(--gray-50); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+.m-card .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+.m-card .value { font-size: 18px; font-weight: 700; margin-top: 2px; }
+.m-row { display:flex; gap:8px; }
+.m-row .m-card { flex: 1; }
+.m-action { background: var(--primary); color: white; padding: 14px; border-radius: 10px; text-align: center; font-weight: 600; margin-bottom: 10px; }
+.m-rdo { background: white; border: 1px solid var(--border); padding: 12px; border-radius: 10px; margin-bottom: 8px; }
+.m-rdo .num { font-weight: 700; color: var(--primary); }
+.m-fab { position: absolute; bottom: 30px; right: 30px; width: 56px; height: 56px; background: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 4px 12px rgba(31,78,120,0.4); }
+.m-tabbar { background: white; border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 8px 0; }
+.m-tab { text-align: center; font-size: 10px; color: var(--text-muted); }
+.m-tab.active { color: var(--primary); }
+.m-tab .icon { font-size: 20px; display: block; }
+@media (max-width: 600px) {
+  .mobile-frame { max-width: 100%; border: none; border-radius: 0; box-shadow: none; }
+}
+</style>
+<div class="page-header">
+  <div class="page-title">📱 Vista Mobile</div>
+  <div class="page-subtitle">Preview do app mobile · acesse <strong>btr-paraiso-ii.netlify.app/mobile.html</strong> direto do celular</div>
+</div>
+
+<div class="grid-2">
+  <div>
+    <div class="mobile-frame">
+      <div class="mobile-status">
+        <span>9:41</span><span>5G ●●●●●  100%</span>
+      </div>
+      <div class="mobile-content" id="mobileContent" style="position: relative;"></div>
+      <div class="m-tabbar">
+        <div class="m-tab active"><span class="icon">🏠</span>Home</div>
+        <div class="m-tab"><span class="icon">📝</span>RDOs</div>
+        <div class="m-tab"><span class="icon">📷</span>Fotos</div>
+        <div class="m-tab"><span class="icon">⚙️</span>Mais</div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">📲 Como acessar pelo celular</div></div>
+      <ol style="font-size:13px; line-height:1.9; padding-left:20px;">
+        <li>Abra no celular: <strong>btr-paraiso-ii.netlify.app/mobile.html</strong></li>
+        <li>iOS: toque em <strong>Compartilhar</strong> → <strong>Adicionar à Tela de Início</strong></li>
+        <li>Android: menu <strong>⋮</strong> → <strong>Adicionar à tela inicial</strong></li>
+        <li>Vira um app standalone no telefone</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">📸 Features Mobile</div></div>
+      <ul style="font-size:13px; line-height:1.9; list-style:none;">
+        <li>✅ Cards grandes para leitura rápida</li>
+        <li>✅ KPIs no topo (Realizado, Saldo, % Físico)</li>
+        <li>✅ Últimos RDOs em swipe horizontal</li>
+        <li>✅ Botão flutuante "+ Novo RDO" (FAB)</li>
+        <li>✅ Tab bar fixa: Home · RDOs · Fotos · Mais</li>
+        <li>🔄 Em breve: upload de foto direto da câmera</li>
+        <li>🔄 Em breve: registro de gasto via formulário curto</li>
+        <li>🔄 Em breve: scanner de NF (OCR)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>function initPage() { const D = window.DATA; 
+  document.getElementById('mobileContent').innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div>
+        <div style="font-size:18px; font-weight:700; color:var(--primary);">BTR Paraíso II</div>
+        <div class="text-xs text-muted">${new Date().toLocaleDateString('pt-BR')}</div>
+      </div>
+      <div style="width:36px; height:36px; background:linear-gradient(135deg, #1F4E78, #2E75B6); border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-weight:600; font-size:12px;">EO</div>
+    </div>
+
+    <div class="m-card" style="background: linear-gradient(135deg, #1F4E78, #2E75B6); color: white;">
+      <div class="label" style="color:rgba(255,255,255,0.7);">REALIZADO</div>
+      <div class="value">${fmt.money(D.kpis.realizado)}</div>
+      <div class="text-xs" style="color:rgba(255,255,255,0.8); margin-top:6px;">${(D.kpis.pct_fisico*100).toFixed(1)}% de ${fmt.money(D.kpis.orcamento_total)}</div>
+    </div>
+
+    <div class="m-row">
+      <div class="m-card"><div class="label">SALDO</div><div class="value" style="font-size:14px;">${fmt.money(D.kpis.saldo)}</div></div>
+      <div class="m-card"><div class="label">DIAS RESTANTES</div><div class="value">${D.aggregations.tempo.restantes}</div></div>
+    </div>
+
+    <div class="m-action">+ Novo Pagamento</div>
+
+    <div style="font-weight:600; margin: 14px 0 8px; font-size:12px; color:var(--text-muted); text-transform:uppercase;">Últimos RDOs</div>
+    ${[...D.rdos].sort((a,b) => a.data > b.data ? -1 : 1).slice(0, 3).map(r => `
+      <div class="m-rdo">
+        <div class="num">RDO #${r.numero}</div>
+        <div class="text-xs text-muted">${fmt.date(r.data)} · ${r.dia_semana || ''}</div>
+        <div class="text-small mt-3" style="margin-top:4px;">${(r.comentario || '').substring(0, 80)}...</div>
+      </div>
+    `).join('')}
+
+    <div class="m-fab">+</div>
+  `;
+ }</script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fornecedores — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="fornecedores">
+<div id="original-content">
+<div class="page-header">
+  <div class="page-title">🏪 Fornecedores & Pagamentos</div>
+  <div class="page-subtitle">Histórico completo de pagamentos · ranking de fornecedores</div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-label">Total de Pagamentos</div><div class="kpi-value" id="fNPgto">—</div></div>
+  <div class="kpi"><div class="kpi-label">Fornecedores Únicos</div><div class="kpi-value" id="fNFor">—</div></div>
+  <div class="kpi success"><div class="kpi-label">Total Pago</div><div class="kpi-value" id="fTotal">—</div></div>
+  <div class="kpi warning"><div class="kpi-label">CNPJ Pendentes</div><div class="kpi-value" id="fNCnpj">—</div></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><div class="card-title">🏆 Top 10 Fornecedores</div></div>
+    <div class="chart-wrap lg"><canvas id="chartTopF"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">🥧 Por Tipo</div></div>
+    <div class="chart-wrap"><canvas id="chartTipoF"></canvas></div>
+    <div class="mt-4 text-small text-muted" id="tipoDetail"></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">Lista de Pagamentos</div>
+    <div class="card-meta" id="fTableMeta">—</div>
+  </div>
+  <div class="filters">
+    <input type="text" id="fBusca" class="input" placeholder="Buscar fornecedor, descrição ou etapa..." oninput="renderForn()" style="flex:1;">
+    <select id="fTipo" class="select" onchange="renderForn()">
+      <option value="todos">Todos os tipos</option>
+      <option value="Material">Material</option>
+      <option value="Mão de Obra">Mão de Obra</option>
+      <option value="Serviço">Serviço</option>
+    </select>
+    <select id="fForma" class="select" onchange="renderForn()">
+      <option value="todas">Todas as contas</option>
+      <option value="PIX Santander Pessoal">PIX Santander</option>
+      <option value="CC Bradesco Pessoal">CC Bradesco</option>
+      <option value="Cartão/Conta Pessoal Santander">Santander Outros</option>
+    </select>
+  </div>
+  <div class="table-wrap">
+    <table id="fTable">
+      <thead><tr>
+        <th>Data</th><th>Fornecedor</th><th>Descrição</th>
+        <th>Etapa</th><th>Tipo</th><th class="num">Valor</th><th>Forma</th><th>Status</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>function initPage() { const D = window.DATA; 
+  document.getElementById('fNPgto').textContent = D.fornecedores.length;
+  const unique = new Set(D.fornecedores.map(f => f.fornecedor.split('(')[0].trim())).size;
+  document.getElementById('fNFor').textContent = unique;
+  document.getElementById('fTotal').textContent = fmt.money(D.fornecedores.reduce((s,f) => s + f.valor_bruto, 0));
+  document.getElementById('fNCnpj').textContent = D.fornecedores.filter(f => !f.cnpj || f.cnpj.includes('[') || f.cnpj.includes('obter')).length || '—';
+
+  const top = D.aggregations.top_forn.slice(0, 10);
+  new Chart(document.getElementById('chartTopF'), {
+    type: 'bar', data: { labels: top.map(t => t[0]),
+      datasets: [{ data: top.map(t => t[1]), backgroundColor: '#1F4E78', borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend: { display: false }},
+      scales: { x: { beginAtZero: true, ticks: { callback: v => 'R$ ' + (v/1000).toFixed(1) + 'k' }}}}
+  });
+
+  const tt = D.aggregations.totais_tipo;
+  new Chart(document.getElementById('chartTipoF'), {
+    type: 'pie', data: { labels: ['Material', 'Mão de Obra', 'Serviço'],
+      datasets: [{ data: [tt.material, tt.mo, tt.servico], backgroundColor: ['#1F4E78', '#FFC000', '#16A34A'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }}}
+  });
+  const total = tt.material + tt.mo + tt.servico;
+  document.getElementById('tipoDetail').innerHTML = `Material <strong>${(tt.material/total*100).toFixed(1)}%</strong> · MO <strong>${(tt.mo/total*100).toFixed(1)}%</strong> · Serviço <strong>${(tt.servico/total*100).toFixed(1)}%</strong>`;
+
+  window.renderForn = () => {
+    const b = (document.getElementById('fBusca').value || '').toLowerCase();
+    const t = document.getElementById('fTipo').value;
+    const fo = document.getElementById('fForma').value;
+    const list = D.fornecedores.filter(f => {
+      if (t !== 'todos' && f.tipo !== t) return false;
+      if (fo !== 'todas' && f.forma_pgto !== fo) return false;
+      if (b && !(f.fornecedor + ' ' + f.descricao + ' ' + f.etapa).toLowerCase().includes(b)) return false;
+      return true;
+    }).sort((a,b) => a.data > b.data ? -1 : 1);
+    document.getElementById('fTableMeta').textContent = list.length + ' pagamentos · ' + fmt.money(list.reduce((s,f) => s + f.valor_bruto, 0));
+    document.querySelector('#fTable tbody').innerHTML = list.map(f => `<tr>
+      <td class="text-small">${f.data}</td>
+      <td class="text-bold">${f.fornecedor}</td>
+      <td class="text-xs text-muted">${f.descricao}</td>
+      <td class="text-xs">${f.etapa}</td>
+      <td>${statusBadge(f.tipo)}</td>
+      <td class="num text-bold">${fmt.money(f.valor_bruto)}</td>
+      <td class="text-xs">${f.forma_pgto || '—'}</td>
+      <td>${statusBadge(f.status)}</td>
+    </tr>`).join('');
+  };
+  renderForn();
+ }</script>
+</body>
+</html>

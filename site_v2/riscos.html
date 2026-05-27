@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Riscos — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779886031">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body data-page="riscos">
+<div id="original-content">
+<div class="page-header">
+  <div class="page-title">⚠️ Riscos & Ocorrências</div>
+  <div class="page-subtitle">Matriz de risco · ocorrências registradas em RDOs</div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi danger"><div class="kpi-label">Ocorrências Críticas</div><div class="kpi-value" id="rOc">—</div></div>
+  <div class="kpi warning"><div class="kpi-label">Riscos Abertos</div><div class="kpi-value" id="rRisc">—</div></div>
+  <div class="kpi"><div class="kpi-label">Riscos Mitigados</div><div class="kpi-value">—</div></div>
+  <div class="kpi success"><div class="kpi-label">Riscos Encerrados</div><div class="kpi-value">—</div></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><div class="card-title">⚠️ Ocorrências Registradas</div></div>
+    <div id="ocList"></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">📋 Matriz de Riscos Conhecidos</div></div>
+    <div id="riscMatrix"></div>
+  </div>
+</div>
+</div>
+<script src="/assets/supabase-client.js"></script>
+<script src="/assets/app.js?v=1779886031"></script>
+<script>function initPage() { const D = window.DATA; 
+  document.getElementById('rOc').textContent = D.ocorrencias.length;
+  document.getElementById('rRisc').textContent = D.riscos ? D.riscos.length : '5';
+
+  const ocL = document.getElementById('ocList');
+  if (D.ocorrencias.length === 0) {
+    ocL.innerHTML = '<p class="text-muted text-small">Nenhuma ocorrência registrada nos RDOs até agora.</p>';
+  } else {
+    ocL.innerHTML = D.ocorrencias.map(o => `<div style="padding:12px; background:var(--gray-50); border-radius:6px; margin-bottom:10px; border-left:3px solid var(--danger);">
+      <div class="text-xs text-muted">RDO #${o.rdo} · ${fmt.date(o.data)} · ${severidadeBadge(o.severidade)}</div>
+      <div class="text-bold" style="margin-top:4px;">${o.tipo}</div>
+      <div class="text-small text-muted" style="margin-top:4px;">${o.descricao}</div>
+    </div>`).join('');
+  }
+
+  // Riscos fixos conhecidos do projeto
+  const riscos = [
+    {tipo: 'Técnico', desc: 'Dreno PVC ø100mm do muro de arrimo antes do aterro', impacto: 'Alto', prob: 'Certa', sev: 'Crítica', acao: 'Comprar tubo PVC + manta + brita antes 29/05'},
+    {tipo: 'Jurídico', desc: 'RRT Fabricio expira 28/08/2026', impacto: 'Alto', prob: 'Certa', sev: 'Crítica', acao: 'Renovar com CAU até 30/06/2026'},
+    {tipo: 'Custo', desc: 'Etapa 2 estourou orçamento (118%)', impacto: 'Médio', prob: 'Ocorrendo', sev: 'Alta', acao: 'Reorçar para R$32k ou cortar escopo'},
+    {tipo: 'Trabalhista', desc: '6 diaristas sem RPA/contrato', impacto: 'Médio', prob: 'Baixa', sev: 'Média', acao: 'Emitir Recibo Simples retroativo'},
+    {tipo: 'Fiscal', desc: 'R$40k PF→PJ sem Contrato de Mútuo', impacto: 'Médio', prob: 'Alta', sev: 'Alta', acao: 'Lavrar Mútuo retroativo a 27/04/2026'},
+    {tipo: 'Operacional', desc: 'Tijolos comprados 3 meses antes (capital parado)', impacto: 'Baixo', prob: 'Certa', sev: 'Baixa', acao: 'Estocar com lona/madeira, longe de umidade'},
+    {tipo: 'Técnico', desc: 'Lona preta vs Betumax para muro arrimo', impacto: 'Médio', prob: 'Mitigado', sev: 'Baixa', acao: 'Betumax comprado em 25/05 — aplicar antes aterro'},
+  ];
+  document.getElementById('riscMatrix').innerHTML = riscos.map(r => `<div style="padding:12px; background:var(--gray-50); border-radius:6px; margin-bottom:10px;">
+    <div class="flex-between"><span>${statusBadge(r.tipo)}</span>${severidadeBadge(r.sev)}</div>
+    <div class="text-bold mt-3" style="margin-top:6px;">${r.desc}</div>
+    <div class="text-xs text-muted" style="margin-top:4px;">Impacto ${r.impacto} · Prob. ${r.prob}</div>
+    <div class="text-small" style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--gray-200);"><strong>Ação:</strong> ${r.acao}</div>
+  </div>`).join('');
+ }</script>
+</body>
+</html>
