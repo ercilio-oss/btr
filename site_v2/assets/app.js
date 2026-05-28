@@ -56,6 +56,7 @@ function buildLayout() {
     { id: 'mobile', href: '/mobile.html', label: 'Vista Mobile', icon: '📱' },
     { section: 'ADMIN' },
     { id: 'admin', href: '/admin.html', label: 'Lançar / Editar', icon: '⚙️' },
+    { id: 'admin-rdos', href: '/admin-rdos.html', label: 'Revisar RDOs IA', icon: '🤖' },
   ];
 
   let navHtml = '';

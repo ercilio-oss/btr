@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Revisar RDOs IA — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779950500">
+</head>
+<body data-page="admin-rdos">
+<div id="original-content">
+<style>
+  .draft-card { border-left: 4px solid var(--warning); background: white; padding: 18px 22px; border-radius: 10px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .draft-card.approved { border-left-color: var(--success); opacity: 0.7; }
+  .draft-card.rejected { border-left-color: var(--danger); opacity: 0.7; }
+  .draft-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .draft-meta { font-size: 12px; color: var(--text-muted); }
+  .draft-conf { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+  .conf-high { background: #DCFCE7; color: #14532D; }
+  .conf-med { background: #FEF3C7; color: #92400E; }
+  .conf-low { background: #FEE2E2; color: #991B1B; }
+  .ativ-row { padding: 8px 0; border-top: 1px dashed #E5E7EB; font-size: 13px; }
+  .ativ-row:first-child { border-top: none; }
+  .ativ-tag { display: inline-block; background: #DBEAFE; color: #1E40AF; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-right: 6px; }
+  .draft-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px; margin: 10px 0; max-width: 500px; }
+  .draft-fotos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; cursor: pointer; }
+  .btn-approve { background: var(--success); color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+  .btn-reject { background: var(--danger); color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+  .btn-edit { background: var(--gray-200); color: var(--text); padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+  .ia-raw { font-family: monospace; font-size: 11px; background: #F9FAFB; padding: 12px; border-radius: 6px; max-height: 200px; overflow: auto; margin-top: 10px; display: none; }
+</style>
+
+<div class="page-header">
+  <div class="page-title">🤖 Revisar RDOs Gerados pela IA</div>
+  <div class="page-subtitle">Rascunhos do WhatsApp aguardando aprovação · revise e aprove ou rejeite</div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-label">Pendentes</div><div class="kpi-value" id="kpiPend">—</div></div>
+  <div class="kpi success"><div class="kpi-label">Aprovados (7d)</div><div class="kpi-value" id="kpiOk">—</div></div>
+  <div class="kpi danger"><div class="kpi-label">Rejeitados (7d)</div><div class="kpi-value" id="kpiRej">—</div></div>
+  <div class="kpi accent"><div class="kpi-label">Confiança média</div><div class="kpi-value" id="kpiConf">—</div></div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">📋 Drafts pendentes</div>
+    <div>
+      <button onclick="reloadDrafts()" class="topbar-btn">🔄 Atualizar</button>
+    </div>
+  </div>
+  <div id="draftsList"></div>
+  <div id="emptyDrafts" style="display:none; padding:40px; text-align:center; color:#6b7280;">
+    <div style="font-size:48px;">📭</div>
+    <div class="text-bold mt-3">Nenhum rascunho pendente</div>
+    <div class="text-muted text-small mt-3">Mande mensagens via WhatsApp para gerar RDOs</div>
+  </div>
+</div>
+
+</div>
+<script src="/assets/supabase-client.js?v=1779950500"></script>
+<script src="/assets/app.js?v=1779950500"></script>
+<script>
+function initPage() {
+  const D = window.DATA;
+  if (!['dono','engenheiro','mestre'].includes(D.user.papel)) {
+    document.querySelector('#original-content').innerHTML = '<div class="alert alert-warning"><div class="alert-icon">🔒</div><div class="alert-body"><div class="alert-title">Acesso negado</div>Apenas dono/engenheiro/mestre podem revisar RDOs IA.</div></div>';
+    return;
+  }
+  reloadDrafts();
+}
+
+window.reloadDrafts = async () => {
+  const sb = window.supabase;
+  const list = document.getElementById('draftsList');
+  list.innerHTML = '<div style="text-align:center; padding:40px;">⏳ Carregando...</div>';
+
+  const { data, error } = await sb.from('rdos_drafts').select('*').order('created_at', { ascending: false }).limit(50);
+  if (error) { list.innerHTML = '<div class="alert alert-danger">'+error.message+'</div>'; return; }
+
+  // KPIs
+  const pendentes = data.filter(d => d.status === 'pendente');
+  const semana = Date.now() - 7*24*60*60*1000;
+  const aprovados = data.filter(d => d.status === 'aprovado' && new Date(d.aprovado_at) > semana);
+  const rejeitados = data.filter(d => d.status === 'rejeitado');
+  const confAvg = data.length ? (data.reduce((s,d) => s + (Number(d.ia_confidence)||0), 0) / data.length * 100).toFixed(0) : 0;
+  document.getElementById('kpiPend').textContent = pendentes.length;
+  document.getElementById('kpiOk').textContent = aprovados.length;
+  document.getElementById('kpiRej').textContent = rejeitados.length;
+  document.getElementById('kpiConf').textContent = confAvg + '%';
+
+  if (data.length === 0) {
+    list.innerHTML = '';
+    document.getElementById('emptyDrafts').style.display = 'block';
+    return;
+  }
+
+  // Renderizar drafts (pendentes primeiro)
+  const ordenados = [...pendentes, ...data.filter(d => d.status !== 'pendente')];
+  list.innerHTML = '';
+  for (const draft of ordenados) {
+    const ia = draft.ia_response || {};
+    const conf = (Number(draft.ia_confidence) || 0.85) * 100;
+    const confCls = conf >= 80 ? 'conf-high' : conf >= 60 ? 'conf-med' : 'conf-low';
+    const statusCls = draft.status === 'aprovado' ? 'approved' : draft.status === 'rejeitado' ? 'rejected' : '';
+
+    // Signed URLs para fotos
+    const fotosHtml = [];
+    if (Array.isArray(draft.fotos_paths)) {
+      for (const path of draft.fotos_paths.slice(0, 8)) {
+        const { data: signed } = await sb.storage.from('fotos-obra').createSignedUrl(path, 3600);
+        if (signed?.signedUrl) fotosHtml.push(`<img src="${signed.signedUrl}" onclick="window.open('${signed.signedUrl}', '_blank')">`);
+      }
+      if (draft.fotos_paths.length > 8) fotosHtml.push(`<div style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; background:#f3f4f6; border-radius:4px; font-size:12px;">+${draft.fotos_paths.length - 8}</div>`);
+    }
+
+    const ativs = (ia.atividades || []).map(a => `
+      <div class="ativ-row">
+        <span class="ativ-tag">${a.cod_etapa || '?'}</span>
+        <strong>${a.etapa_nome || '—'}</strong>
+        ${a.pct_executado ? ` · ${(a.pct_executado*100).toFixed(0)}%` : ''}
+        ${a.status ? ` · ${a.status}` : ''}<br>
+        <span style="color:#6b7280; padding-left: 38px;">${a.descricao || ''}</span>
+        ${(a.mao_obra_valor || a.material_valor) ? `<br><span style="padding-left:38px; color:#16A34A;">${a.mao_obra_valor ? 'MO R$ '+a.mao_obra_valor : ''} ${a.material_valor ? 'Mat R$ '+a.material_valor : ''}</span>` : ''}
+      </div>
+    `).join('');
+
+    const ocos = (ia.ocorrencias || []).map(o => `
+      <div style="margin-top:6px; padding:6px 10px; background:#FEF2F2; border-left:3px solid var(--danger); border-radius:4px; font-size:12px;">
+        ⚠️ <strong>${o.tipo}</strong> (${o.severidade}): ${o.descricao}
+      </div>
+    `).join('');
+
+    const card = document.createElement('div');
+    card.className = `draft-card ${statusCls}`;
+    card.id = `draft-${draft.id}`;
+    card.innerHTML = `
+      <div class="draft-header">
+        <div>
+          <div class="text-bold">📅 RDO ${draft.numero_sugerido ? '#' + draft.numero_sugerido : ''} · ${draft.data}</div>
+          <div class="draft-meta">
+            Origem: WhatsApp ${draft.twilio_from || ''} ·
+            Modelo: ${draft.ia_model} ·
+            ${new Date(draft.created_at).toLocaleString('pt-BR')}
+          </div>
+        </div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <span class="draft-conf ${confCls}">IA ${conf.toFixed(0)}%</span>
+          ${draft.status !== 'pendente' ? `<span class="badge ${draft.status === 'aprovado' ? 'badge-green' : 'badge-red'}">${draft.status.toUpperCase()}</span>` : ''}
+        </div>
+      </div>
+
+      ${draft.comentario ? `<div style="background:#F9FAFB; padding:10px 14px; border-radius:6px; font-size:13px; margin-bottom:10px;">💬 ${draft.comentario}</div>` : ''}
+
+      ${fotosHtml.length ? `<div class="draft-fotos">${fotosHtml.join('')}</div>` : ''}
+
+      ${ativs ? `<div style="margin:10px 0;"><div class="text-small text-muted">Atividades (${ia.atividades?.length || 0}):</div>${ativs}</div>` : ''}
+
+      ${ocos ? `<div style="margin:10px 0;"><div class="text-small text-muted">Ocorrências:</div>${ocos}</div>` : ''}
+
+      ${ia.mao_obra_efetivo && ia.mao_obra_efetivo.length ? `<div style="font-size:12px; color:#6b7280; margin-top:8px;">👷 Efetivo: ${ia.mao_obra_efetivo.map(m => `${m.funcao} (${m.profissional || '—'}) x${m.qtd}`).join(', ')}</div>` : ''}
+
+      <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end;">
+        ${draft.status === 'pendente' ? `
+          <button class="btn-reject" onclick="rejectDraft(${draft.id})">❌ Rejeitar</button>
+          <button class="btn-edit" onclick="toggleRaw(${draft.id})">🔍 Ver JSON</button>
+          <button class="btn-approve" onclick="approveDraft(${draft.id})">✅ Aprovar e Criar RDO</button>
+        ` : `
+          <button class="btn-edit" onclick="toggleRaw(${draft.id})">🔍 Ver JSON</button>
+          ${draft.rdo_id ? `<a href="/rdos.html" class="btn-edit" style="text-decoration:none;">Ver RDO criado →</a>` : ''}
+        `}
+      </div>
+
+      <div class="ia-raw" id="raw-${draft.id}"><pre>${JSON.stringify(ia, null, 2)}</pre></div>
+    `;
+    list.appendChild(card);
+  }
+
+  document.getElementById('emptyDrafts').style.display = 'none';
+};
+
+window.toggleRaw = (id) => {
+  const el = document.getElementById('raw-' + id);
+  el.style.display = el.style.display === 'block' ? 'none' : 'block';
+};
+
+window.approveDraft = async (id) => {
+  if (!confirm('Aprovar este rascunho e criar o RDO + atividades?')) return;
+  const sb = window.supabase;
+
+  // Buscar draft
+  const { data: draft } = await sb.from('rdos_drafts').select('*').eq('id', id).single();
+  if (!draft) return alert('Draft não encontrado');
+
+  // 1) Criar RDO real
+  const { data: rdo, error: e1 } = await sb.from('rdos').insert({
+    numero: draft.numero_sugerido || Math.floor(Math.random()*1000) + 100,
+    data: draft.data,
+    dia_semana: new Date(draft.data).toLocaleDateString('en-US', { weekday: 'long' }),
+    clima_manha: draft.clima_manha,
+    clima_tarde: draft.clima_tarde,
+    cond_manha: 'Praticável',
+    comentario: draft.comentario,
+    fotos_info: draft.fotos_paths?.length ? `${draft.fotos_paths.length} fotos via WhatsApp` : '',
+    status: 'Aprovado',
+    criado_por: 'IA via WhatsApp',
+    aprovado_por: (window.DATA.user.nome || window.DATA.user.email)
+  }).select().single();
+  if (e1) return alert('Erro criando RDO: ' + e1.message);
+
+  // 2) Criar atividades
+  const ativs = draft.ia_response?.atividades || [];
+  for (const a of ativs) {
+    await sb.from('atividades').insert({
+      rdo_id: rdo.id,
+      rdo_numero: rdo.numero,
+      data: draft.data,
+      etapa_cod: a.cod_etapa,
+      etapa_nome: a.etapa_nome,
+      status: a.status || 'Em Execução',
+      descricao: a.descricao,
+      pct: a.pct_executado || 0,
+      mao_obra: a.mao_obra_valor || 0,
+      material: a.material_valor || 0,
+      total: (a.mao_obra_valor || 0) + (a.material_valor || 0)
+    });
+  }
+
+  // 3) Criar mão de obra
+  const mo = draft.ia_response?.mao_obra_efetivo || [];
+  for (const m of mo) {
+    await sb.from('mao_obra').insert({
+      rdo_id: rdo.id,
+      rdo_numero: rdo.numero,
+      data: draft.data,
+      funcao: m.funcao,
+      profissional: m.profissional || '—',
+      quantidade: m.qtd || 1,
+      horas: m.horas || 8
+    });
+  }
+
+  // 4) Criar ocorrências
+  const ocos = draft.ia_response?.ocorrencias || [];
+  for (const o of ocos) {
+    await sb.from('ocorrencias').insert({
+      rdo_id: rdo.id,
+      rdo_numero: rdo.numero,
+      data: draft.data,
+      tipo: o.tipo,
+      severidade: o.severidade,
+      status: 'Aberto',
+      descricao: o.descricao
+    });
+  }
+
+  // 5) Registrar fotos
+  for (const path of (draft.fotos_paths || [])) {
+    await sb.from('fotos').insert({
+      rdo_id: rdo.id,
+      rdo_numero: rdo.numero,
+      data: draft.data,
+      descricao: 'Foto via WhatsApp',
+      url: path,
+      storage_path: path,
+      upload_por: window.DATA.user.id
+    });
+  }
+
+  // 6) Marcar draft como aprovado
+  await sb.from('rdos_drafts').update({
+    status: 'aprovado',
+    aprovado_por: window.DATA.user.id,
+    aprovado_at: new Date().toISOString(),
+    rdo_id: rdo.id
+  }).eq('id', id);
+
+  alert(`✅ RDO #${rdo.numero} criado com ${ativs.length} atividades, ${mo.length} MO, ${ocos.length} ocorrências, ${(draft.fotos_paths||[]).length} fotos.`);
+  reloadDrafts();
+};
+
+window.rejectDraft = async (id) => {
+  const motivo = prompt('Motivo da rejeição (opcional):') || '';
+  if (motivo === null) return;
+  const sb = window.supabase;
+  await sb.from('rdos_drafts').update({
+    status: 'rejeitado',
+    aprovado_por: window.DATA.user.id,
+    aprovado_at: new Date().toISOString()
+  }).eq('id', id);
+  reloadDrafts();
+};
+</script>
+</body>
+</html>
