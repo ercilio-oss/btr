@@ -34,11 +34,11 @@
   // CARREGAR TUDO DO BANCO
   // ============================================================
   try {
-    const [etapas, rdos, atividades, fornecedores, ocorrencias, compliance, cronograma, aquisicao, kpis, config, perfil, maoObra] = await Promise.all([
+    const [etapas, rdos, atividades, pagamentos, ocorrencias, compliance, cronograma, aquisicao, kpis, config, perfil, maoObra, fornMaster] = await Promise.all([
       supabase.from('etapas').select('*').order('ordem'),
       supabase.from('rdos').select('*').order('data', { ascending: false }),
       supabase.from('atividades').select('*').order('data', { ascending: false }),
-      supabase.from('fornecedores').select('*').order('data', { ascending: false }),
+      supabase.from('pagamentos').select('*').order('data', { ascending: false }),
       supabase.from('ocorrencias').select('*').order('data', { ascending: false }),
       supabase.from('compliance').select('*').order('id'),
       supabase.from('cronograma_mensal').select('*').order('ordem'),
@@ -46,8 +46,11 @@
       supabase.from('v_kpis').select('*').single(),
       supabase.from('config_obra').select('*'),
       supabase.from('perfis').select('*').eq('id', session.user.id).single(),
-      supabase.from('mao_obra').select('*').order('data', { ascending: false })
+      supabase.from('mao_obra').select('*').order('data', { ascending: false }),
+      supabase.from('v_fornecedores_completo').select('*').order('total_pago', { ascending: false })
     ]);
+    // Compat: pagamentos antigos eram chamados de "fornecedores"
+    const fornecedores = pagamentos;
 
     // ============================================================
     // CONFIG → meta {}
@@ -148,16 +151,11 @@
       else if (cat.includes('aquis')) totais_tipo.aquisicao += v;
     });
 
-    // top_forn: ranking dos fornecedores que mais receberam
-    const fornMap = {};
-    (fornecedores.data || []).forEach(f => {
-      // Normalizar nomes: "Cerâmica Modelo (50% Etapa 2)" → "Cerâmica Modelo"
-      const nomeBase = (f.nome || '').replace(/\s*\([^)]*\)\s*/g, '').trim();
-      // Também tirar "(vendedor do terreno)" etc
-      const nome = nomeBase || '[Sem nome]';
-      fornMap[nome] = (fornMap[nome] || 0) + Number(f.valor || 0);
-    });
-    const top_forn = Object.entries(fornMap).sort((a,b) => b[1] - a[1]);
+    // top_forn: ranking via master (já deduplicado e com totais)
+    const top_forn = (fornMaster.data || [])
+      .map(f => [f.nome, Number(f.total_pago) || 0])
+      .filter(([_, t]) => t > 0)
+      .sort((a, b) => b[1] - a[1]);
 
     // contas: por método de pagamento (extrair da descrição)
     const contas = {};
@@ -231,10 +229,43 @@
         id: c.id, categoria: c.categoria, item: c.item, base_legal: c.base_legal,
         obrigatorio: c.obrigatorio, status: c.status, responsavel: c.responsavel || '', obs: c.observacao
       })),
-      fornecedores: (fornecedores.data || []).map(f => ({
+      fornecedores: (pagamentos.data || []).map(f => ({
         data: f.data, fornecedor: f.nome, descricao: f.descricao,
         etapa: f.etapa_ref, tipo: f.categoria, valor_bruto: Number(f.valor),
-        status: f.status_pagamento
+        status: f.status_pagamento, fornecedor_id: f.fornecedor_id
+      })),
+      // NOVO: Lista master de fornecedores únicos com totais agregados
+      fornecedores_master: (fornMaster.data || []).map(f => ({
+        id: f.id,
+        nome: f.nome,
+        nome_fantasia: f.nome_fantasia,
+        cnpj_cpf: f.cnpj_cpf,
+        tipo_pessoa: f.tipo_pessoa,
+        email: f.email,
+        telefone: f.telefone,
+        whatsapp: f.whatsapp,
+        contato_principal: f.contato_principal,
+        endereco: f.endereco,
+        cidade: f.cidade,
+        uf: f.uf,
+        cep: f.cep,
+        banco: f.banco,
+        pix_key: f.pix_key,
+        pix_tipo: f.pix_tipo,
+        categoria: f.categoria,
+        subcategoria: f.subcategoria,
+        abc: f.abc,
+        avaliacao_geral: Number(f.avaliacao_geral) || null,
+        avaliacao_pontualidade: f.avaliacao_pontualidade,
+        avaliacao_qualidade: f.avaliacao_qualidade,
+        avaliacao_preco: f.avaliacao_preco,
+        status: f.status,
+        observacao: f.observacao,
+        total_pago: Number(f.total_pago) || 0,
+        n_pagamentos: Number(f.n_pagamentos) || 0,
+        n_contratos: Number(f.n_contratos) || 0,
+        ultimo_pagamento: f.ultimo_pagamento,
+        primeiro_pagamento: f.primeiro_pagamento
       })),
       aquisicao_terreno: aquisicao.data && aquisicao.data[0] ? {
         cod: 'T1',
