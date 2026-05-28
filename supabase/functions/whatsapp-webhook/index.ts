@@ -1,71 +1,66 @@
 // @ts-nocheck
 /**
- * BTR Paraíso II — Webhook Twilio WhatsApp
+ * BTR Paraíso II — Webhook Z-API WhatsApp
  *
- * Recebe mensagens do Twilio, salva na inbox, dispara pipeline:
+ * Recebe mensagens do Z-API, pipeline:
  *  - Áudio → Whisper → texto
  *  - Imagem → Supabase Storage
  *  - Texto → guardado
- *  - Buffer de 60s → Claude estrutura RDO → salva como rascunho
+ *  - Buffer 60s → Claude estrutura RDO → salva como rascunho
  *  - Responde WhatsApp com link de revisão
  */
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID")!;
-const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN")!;
-const TWILIO_WHATSAPP_FROM = Deno.env.get("TWILIO_WHATSAPP_FROM")!; // ex: whatsapp:+5562...
+const ZAPI_INSTANCE_ID = Deno.env.get("ZAPI_INSTANCE_ID")!;
+const ZAPI_TOKEN = Deno.env.get("ZAPI_TOKEN")!;
+const ZAPI_CLIENT_TOKEN = Deno.env.get("ZAPI_CLIENT_TOKEN")!;
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 const SITE_BASE_URL = Deno.env.get("SITE_BASE_URL") || "https://btr-paraiso-ii.netlify.app";
 
+const ZAPI_BASE = `https://api.z-api.io/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}`;
 const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-const BUFFER_SECONDS = 60; // tempo para agregar mensagens antes de gerar RDO
+const BUFFER_SECONDS = 60;
 
 // ============================================================
-// Helpers
+// Z-API helpers
 // ============================================================
-function twilioAuthHeader(): string {
-  return "Basic " + btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
+function zapiHeaders() {
+  return {
+    "Content-Type": "application/json",
+    "Client-Token": ZAPI_CLIENT_TOKEN,
+  };
 }
 
-async function downloadTwilioMedia(url: string): Promise<{ buffer: Uint8Array; contentType: string }> {
-  const resp = await fetch(url, { headers: { Authorization: twilioAuthHeader() } });
-  if (!resp.ok) throw new Error(`Twilio media download failed: ${resp.status}`);
+async function sendWhatsAppText(phone: string, message: string) {
+  const resp = await fetch(`${ZAPI_BASE}/send-text`, {
+    method: "POST",
+    headers: zapiHeaders(),
+    body: JSON.stringify({ phone, message }),
+  });
+  if (!resp.ok) console.error("sendWhatsApp falhou", resp.status, await resp.text());
+  return resp.ok;
+}
+
+async function downloadMediaUrl(url: string) {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`Media download failed: ${resp.status}`);
   return {
     buffer: new Uint8Array(await resp.arrayBuffer()),
     contentType: resp.headers.get("content-type") || "application/octet-stream",
   };
 }
 
-async function sendWhatsAppReply(to: string, body: string): Promise<void> {
-  const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
-  const form = new URLSearchParams();
-  form.set("From", TWILIO_WHATSAPP_FROM);
-  form.set("To", to);
-  form.set("Body", body);
-  await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: twilioAuthHeader(),
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: form.toString(),
-  });
-}
-
 async function transcribeWithWhisper(buffer: Uint8Array, contentType: string): Promise<string> {
   const form = new FormData();
   const blob = new Blob([buffer], { type: contentType });
-  const ext = contentType.includes("ogg") ? "ogg" : contentType.includes("mpeg") ? "mp3" : "audio";
+  const ext = contentType.includes("ogg") ? "ogg" : contentType.includes("mpeg") ? "mp3" : contentType.includes("webm") ? "webm" : "audio";
   form.append("file", blob, `audio.${ext}`);
   form.append("model", "whisper-1");
   form.append("language", "pt");
   form.append("response_format", "text");
-
   const resp = await fetch("https://api.openai.com/v1/audio/transcriptions", {
     method: "POST",
     headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
@@ -75,68 +70,77 @@ async function transcribeWithWhisper(buffer: Uint8Array, contentType: string): P
   return (await resp.text()).trim();
 }
 
-async function uploadPhotoToStorage(
-  buffer: Uint8Array,
-  contentType: string,
-  rdoData: string,
-): Promise<string> {
+async function uploadPhotoToStorage(buffer: Uint8Array, contentType: string, rdoData: string): Promise<string> {
   const ext = contentType.split("/")[1]?.split("+")[0] || "jpg";
   const path = `whatsapp/${rdoData}/${Date.now()}_${crypto.randomUUID()}.${ext}`;
-  const { error } = await supa.storage
-    .from("fotos-obra")
-    .upload(path, buffer, { contentType, upsert: false });
+  const { error } = await supa.storage.from("fotos-obra").upload(path, buffer, { contentType, upsert: false });
   if (error) throw error;
   return path;
 }
 
 // ============================================================
-// Webhook handler
+// Webhook handler — Z-API on-message-received format
 // ============================================================
-async function handleWebhook(formData: FormData): Promise<Response> {
-  const messageSid = formData.get("MessageSid")?.toString() || "";
-  const from = formData.get("From")?.toString() || "";
-  const to = formData.get("To")?.toString() || "";
-  const body = formData.get("Body")?.toString() || "";
-  const numMedia = parseInt(formData.get("NumMedia")?.toString() || "0");
+async function handleWebhook(payload: any): Promise<Response> {
+  if (payload.fromMe === true) return new Response("Ignored (fromMe)", { status: 200 });
+  if (payload.isGroup === true) return new Response("Ignored (group)", { status: 200 });
 
+  const phone = payload.phone || payload.participantPhone || "";
+  if (!phone) return new Response("No phone", { status: 400 });
+
+  const messageId = payload.messageId || payload.id || crypto.randomUUID();
+
+  let body = "";
   const mediaUrls: string[] = [];
   const mediaTypes: string[] = [];
-  for (let i = 0; i < numMedia; i++) {
-    mediaUrls.push(formData.get(`MediaUrl${i}`)?.toString() || "");
-    mediaTypes.push(formData.get(`MediaContentType${i}`)?.toString() || "");
+
+  if (payload.text?.message) {
+    body = payload.text.message;
+  } else if (payload.image) {
+    mediaUrls.push(payload.image.imageUrl);
+    mediaTypes.push(payload.image.mimeType || "image/jpeg");
+    if (payload.image.caption) body = payload.image.caption;
+  } else if (payload.audio) {
+    mediaUrls.push(payload.audio.audioUrl);
+    mediaTypes.push(payload.audio.mimeType || "audio/ogg");
+  } else if (payload.video) {
+    mediaUrls.push(payload.video.videoUrl);
+    mediaTypes.push(payload.video.mimeType || "video/mp4");
+    if (payload.video.caption) body = payload.video.caption;
+  } else if (payload.document) {
+    mediaUrls.push(payload.document.documentUrl);
+    mediaTypes.push(payload.document.mimeType || "application/octet-stream");
+  } else {
+    return new Response("Tipo não suportado", { status: 200 });
   }
 
-  // 1) Verificar se o número está autorizado
-  const numero = from.replace("whatsapp:", "");
+  const numeroFmt = phone.startsWith("+") ? phone : `+${phone}`;
+
   const { data: perfil } = await supa
     .from("perfis")
     .select("id, nome, papel, whatsapp_numero")
-    .eq("whatsapp_numero", numero)
+    .eq("whatsapp_numero", numeroFmt)
     .eq("ativo", true)
     .single();
 
   if (!perfil) {
-    await sendWhatsAppReply(
-      from,
-      `⛔ Número não autorizado. Solicite ao admin que cadastre o WhatsApp ${numero} no perfil.`,
-    );
+    await sendWhatsAppText(phone, `⛔ Número não autorizado. Solicite ao admin que cadastre o WhatsApp ${numeroFmt} no perfil.`);
     return new Response("Unauthorized", { status: 200 });
   }
 
   if (!["dono", "engenheiro", "mestre"].includes(perfil.papel)) {
-    await sendWhatsAppReply(from, `🔒 Seu papel (${perfil.papel}) não tem permissão para criar RDOs.`);
+    await sendWhatsAppText(phone, `🔒 Seu papel (${perfil.papel}) não tem permissão para criar RDOs.`);
     return new Response("Forbidden", { status: 200 });
   }
 
-  // 2) Salvar mensagem raw no inbox
   const { data: inboxRow, error: insErr } = await supa
     .from("whatsapp_inbox")
     .insert({
-      twilio_message_sid: messageSid,
-      twilio_from: from,
-      twilio_to: to,
+      twilio_message_sid: messageId,
+      twilio_from: numeroFmt,
+      twilio_to: "",
       body,
-      num_media: numMedia,
+      num_media: mediaUrls.length,
       media_urls: mediaUrls,
       media_types: mediaTypes,
       status: "pending",
@@ -149,29 +153,17 @@ async function handleWebhook(formData: FormData): Promise<Response> {
     return new Response("DB error", { status: 500 });
   }
 
-  // 3) Processar mídia em background (responder webhook rápido)
-  EdgeRuntime.waitUntil(processMessage(inboxRow.id, from, body, mediaUrls, mediaTypes, perfil));
+  EdgeRuntime.waitUntil(processMessage(inboxRow.id, phone, numeroFmt, mediaUrls, mediaTypes, perfil));
 
-  // 4) Resposta imediata pro Twilio (vazia ou com confirmação leve)
-  const ack = numMedia > 0
-    ? `📥 Recebi ${numMedia} mídia(s). Processando...`
-    : `📥 Recebi sua mensagem. Aguardando 60s antes de criar o RDO (mande mais mídia se quiser).`;
-  await sendWhatsAppReply(from, ack);
+  const ack = mediaUrls.length > 0
+    ? `📥 Recebi ${mediaUrls.length} mídia(s). Processando...`
+    : `📥 Recebi sua mensagem. Aguardando 60s antes de criar o RDO (mande mais se quiser).`;
+  await sendWhatsAppText(phone, ack);
 
   return new Response("OK", { status: 200 });
 }
 
-// ============================================================
-// Pipeline assíncrono: download mídia, transcreve, agrupa
-// ============================================================
-async function processMessage(
-  inboxId: number,
-  from: string,
-  body: string,
-  mediaUrls: string[],
-  mediaTypes: string[],
-  perfil: any,
-) {
+async function processMessage(inboxId: number, phoneRaw: string, numeroFmt: string, mediaUrls: string[], mediaTypes: string[], perfil: any) {
   let transcribed = "";
   const photoPaths: string[] = [];
   const today = new Date().toISOString().substring(0, 10);
@@ -183,12 +175,12 @@ async function processMessage(
       const url = mediaUrls[i];
       const type = mediaTypes[i];
 
-      if (type.startsWith("audio/")) {
-        const { buffer, contentType } = await downloadTwilioMedia(url);
+      if (type.startsWith("audio/") || type === "application/ogg") {
+        const { buffer, contentType } = await downloadMediaUrl(url);
         const text = await transcribeWithWhisper(buffer, contentType);
         transcribed += (transcribed ? " " : "") + text;
       } else if (type.startsWith("image/")) {
-        const { buffer, contentType } = await downloadTwilioMedia(url);
+        const { buffer, contentType } = await downloadMediaUrl(url);
         const path = await uploadPhotoToStorage(buffer, contentType, today);
         photoPaths.push(path);
       }
@@ -204,42 +196,34 @@ async function processMessage(
       })
       .eq("id", inboxId);
 
-    // 4) Verificar se já tem batch pendente. Se não, agendar batch para 60s
-    await scheduleOrAggregateBatch(from, perfil);
+    await scheduleOrAggregateBatch(phoneRaw, numeroFmt, perfil);
   } catch (err) {
     console.error(`processMessage ${inboxId} error:`, err);
     await supa
       .from("whatsapp_inbox")
       .update({ status: "failed", error: String(err) })
       .eq("id", inboxId);
-    await sendWhatsAppReply(from, `❌ Erro processando: ${String(err).substring(0, 200)}`);
+    await sendWhatsAppText(phoneRaw, `❌ Erro processando: ${String(err).substring(0, 200)}`);
   }
 }
 
-// ============================================================
-// Aguardar 60s sem novas mensagens → gerar RDO
-// ============================================================
-async function scheduleOrAggregateBatch(from: string, perfil: any) {
-  // Estratégia simples: dorme 60s, depois pega TODAS as mensagens ainda não-batched desse from
+async function scheduleOrAggregateBatch(phoneRaw: string, numeroFmt: string, perfil: any) {
   await new Promise((r) => setTimeout(r, BUFFER_SECONDS * 1000));
 
-  // Buscar mensagens pendentes (transcribed + sem batch_id) desse from
   const { data: msgs } = await supa
     .from("whatsapp_inbox")
     .select("*")
-    .eq("twilio_from", from)
+    .eq("twilio_from", numeroFmt)
     .in("status", ["transcribed", "pending"])
     .is("batch_id", null)
     .order("received_at", { ascending: true });
 
   if (!msgs || msgs.length === 0) return;
 
-  // Reservar batch_id
   const batchId = Date.now();
   const ids = msgs.map((m) => m.id);
   await supa.from("whatsapp_inbox").update({ batch_id: batchId, status: "batched" }).in("id", ids);
 
-  // Agregar texto + fotos
   const textoCompleto = msgs
     .map((m) => (m.body ? m.body + " " : "") + (m.transcribed_text || ""))
     .join("\n")
@@ -249,15 +233,13 @@ async function scheduleOrAggregateBatch(from: string, perfil: any) {
     if (Array.isArray(m.stored_photo_paths)) todasFotos.push(...m.stored_photo_paths);
   });
 
-  // 5) Chamar Claude para estruturar RDO
   const rdoJson = await chamarClaudeParaRdo(textoCompleto, todasFotos.length, perfil);
 
-  // 6) Salvar como rascunho
   const { data: draft } = await supa
     .from("rdos_drafts")
     .insert({
       origem: "whatsapp_ia",
-      twilio_from: from,
+      twilio_from: numeroFmt,
       data: rdoJson.data || new Date().toISOString().substring(0, 10),
       numero_sugerido: rdoJson.numero_sugerido,
       comentario: rdoJson.comentario_geral,
@@ -273,10 +255,8 @@ async function scheduleOrAggregateBatch(from: string, perfil: any) {
     .select()
     .single();
 
-  // Atualizar inbox com draft_id
   await supa.from("whatsapp_inbox").update({ rdo_draft_id: draft.id }).in("id", ids);
 
-  // Resposta no WhatsApp
   const linkRevisao = `${SITE_BASE_URL}/admin-rdos.html?draft=${draft.id}`;
   const resumo = [
     `✅ RDO estruturado!`,
@@ -289,130 +269,45 @@ async function scheduleOrAggregateBatch(from: string, perfil: any) {
     `👉 Revisar e aprovar:`,
     linkRevisao,
   ].join("\n");
-  await sendWhatsAppReply(from, resumo);
+  await sendWhatsAppText(phoneRaw, resumo);
 }
 
-// ============================================================
-// Claude — estrutura o RDO
-// ============================================================
 async function chamarClaudeParaRdo(texto: string, numFotos: number, perfil: any): Promise<any> {
   const today = new Date().toISOString().substring(0, 10);
+  const systemPrompt = `Você é um assistente que estrutura RDOs para obra BTR 2 casas em Sen. Canedo/GO da Olive Tree.
 
-  const systemPrompt = `Você é um assistente que estrutura Relatórios Diários de Obra (RDO) brasileiros para uma obra residencial BTR de 2 casas em Senador Canedo/GO da Olive Tree Soluções Imobiliarias.
+ETAPAS: 1=Serv Prelim, 2=Fundações, 3=Estrutura, 4=Alvenaria, 5=Cobertura, 6=Hidráulica, 7=Elétrica, 8=Esquadrias, 9=Rev Internos, 10=Rev Externos, 11=Pisos, 12=Pintura, 13=Louças, 14=Bancadas, 15=Forros, 16=Áreas Externas, 17=Limpeza, 18=Admin, 19=Encargos, 20=Imprevistos. F1=Gesso, F2=Rufos, F3=Marcenaria, F4=Muros Arrimo, F5=Muros Perimetrais, F6=Fossas, F7=Vidraçaria.
 
-CONTEXTO DA OBRA:
-- 20 etapas NBR (códigos '1' a '20') + 7 itens fora (F1-F7) + T1 (terreno)
-- Etapa 1: Serviços Preliminares
-- Etapa 2: Movimento de Terra / Fundações
-- Etapa 3: Estrutura
-- Etapa 4: Alvenaria e Vedações
-- Etapa 5: Cobertura
-- Etapa 6: Instalações Hidráulicas
-- Etapa 7: Instalações Elétricas
-- Etapa 8: Esquadrias
-- F1: Gesso · F2: Rufos e calhas · F3: Marcenaria
-- F4: Muros de arrimo · F5: Muros perimetrais e calçadas
-- F6: Fossas e sumidouros · F7: Vidraçaria
-
-RETORNE APENAS JSON VÁLIDO (sem markdown, sem comentários), com esta estrutura:
-
-{
-  "data": "YYYY-MM-DD",
-  "numero_sugerido": número ou null,
-  "clima_manha": "Claro" | "Nublado" | "Chuvoso" | "Parcial",
-  "clima_tarde": "Claro" | "Nublado" | "Chuvoso" | "Parcial",
-  "condicao": "Praticável" | "Impraticável" | "Parcial",
-  "atividades": [
-    {
-      "cod_etapa": "1" | "2" | ... | "F1" | ... | "F7",
-      "etapa_nome": "nome da etapa",
-      "descricao": "o que foi feito",
-      "pct_executado": 0.0-1.0,
-      "status": "A Iniciar" | "Em Execução" | "Concluída",
-      "mao_obra_valor": número ou 0,
-      "material_valor": número ou 0
-    }
-  ],
-  "mao_obra_efetivo": [
-    {"funcao": "Pedreiro" | "Servente" | "Ajudante" | "Eletricista" | "Encanador" | "Carpinteiro" | "Mestre", "profissional": "nome", "qtd": 1, "horas": 8}
-  ],
-  "material_recebido": [
-    {"item": "areia/cimento/...", "qtd": "X sacos/m³", "fornecedor": "nome"}
-  ],
-  "ocorrencias": [
-    {"tipo": "Atraso" | "Acidente" | "Risco Técnico" | "Outro", "descricao": "...", "severidade": "Baixa" | "Média" | "Alta" | "Crítica"}
-  ],
-  "comentario_geral": "resumo do dia",
-  "alertas_para_investidor": ["pontos que o dono deve saber"],
-  "_confidence": 0.0-1.0
-}
-
-REGRAS:
-- Identifique etapa pelo contexto ("concretagem da sapata" → 2, "muro de arrimo" → F4, "parede sendo levantada" → 4, "telhado" → 5, "esgoto" → 6, "fiação" → 7)
-- Para áreas externas (calçada/muro divisa/garagem), use F5
-- Se houver foto sem texto, descreva como "Foto enviada — sem contexto textual" e use baixa confidence
-- Se mencionar valores ($/R$), classifique como mao_obra_valor ou material_valor
-- Data: use a data de hoje se não especificado (${today})
-- Numero_sugerido: pode deixar null que o sistema atribui`;
-
-  const userPrompt = `Mensagem recebida do ${perfil.nome} (papel: ${perfil.papel}) via WhatsApp em ${today}:
-
-"${texto}"
-
-${numFotos > 0 ? `[${numFotos} foto(s) anexada(s) — não precisa descrever, só registre no comentário que houveram fotos]` : ""}
-
-Estruture o RDO em JSON conforme o schema. Retorne SOMENTE o JSON, sem qualquer texto adicional.`;
-
+RETORNE APENAS JSON: {data, numero_sugerido, clima_manha, clima_tarde, condicao, atividades:[{cod_etapa,etapa_nome,descricao,pct_executado,status,mao_obra_valor,material_valor}], mao_obra_efetivo:[{funcao,profissional,qtd,horas}], material_recebido:[{item,qtd,fornecedor}], ocorrencias:[{tipo,descricao,severidade}], comentario_geral, alertas_para_investidor:[], _confidence:0-1}. Data hoje: ${today}.`;
+  const userPrompt = `${perfil.nome} (${perfil.papel}) enviou via WhatsApp:\n\n"${texto}"\n\n${numFotos > 0 ? `[${numFotos} foto(s) anexada(s)]` : ""}\n\nEstruture em JSON. Retorne SOMENTE JSON sem markdown.`;
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: {
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 2000,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    }),
+    headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 2000, system: systemPrompt, messages: [{ role: "user", content: userPrompt }] }),
   });
-
   if (!resp.ok) throw new Error(`Claude failed: ${resp.status} ${await resp.text()}`);
   const data = await resp.json();
   const content = data.content?.[0]?.text || "{}";
-
-  // Limpar markdown se Claude colocar
   const cleaned = content.replace(/^```(?:json)?\s*|\s*```$/g, "").trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch (e) {
-    console.error("Failed to parse Claude JSON:", cleaned);
-    return { _confidence: 0.1, comentario_geral: cleaned, atividades: [] };
-  }
+  try { return JSON.parse(cleaned); } catch { return { _confidence: 0.1, comentario_geral: cleaned, atividades: [] }; }
 }
 
-// ============================================================
-// Entry point
-// ============================================================
 Deno.serve(async (req) => {
-  if (req.method !== "POST") {
-    return new Response("Use POST", { status: 405 });
+  if (req.method === "GET") {
+    return new Response(JSON.stringify({ status: "ok", service: "btr-paraiso-ii whatsapp webhook (Z-API)", version: 3 }), {
+      headers: { "content-type": "application/json" },
+    });
   }
+  if (req.method !== "POST") return new Response("Use POST", { status: 405 });
 
   try {
-    const contentType = req.headers.get("content-type") || "";
-    let formData: FormData;
-
-    if (contentType.includes("application/x-www-form-urlencoded")) {
-      const text = await req.text();
-      formData = new FormData();
-      new URLSearchParams(text).forEach((v, k) => formData.append(k, v));
-    } else {
-      formData = await req.formData();
+    const incomingToken = req.headers.get("client-token") || "";
+    if (ZAPI_CLIENT_TOKEN && incomingToken && incomingToken !== ZAPI_CLIENT_TOKEN) {
+      console.error("Invalid Client-Token");
+      return new Response("Invalid token", { status: 403 });
     }
-
-    return await handleWebhook(formData);
+    const payload = await req.json();
+    return await handleWebhook(payload);
   } catch (err) {
     console.error("Webhook error:", err);
     return new Response("Internal error: " + String(err), { status: 500 });

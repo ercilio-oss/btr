@@ -1,6 +1,6 @@
-# 🤖 Fase 3 — Setup WhatsApp Business + Edge Function
+# 🤖 Fase 3 — Setup WhatsApp Z-API + Edge Function
 
-**Status:** Edge Function deployada. Aguardando credenciais externas.
+**Status:** Edge Function v3 deployada com Z-API. Aguardando credenciais.
 
 ---
 
@@ -10,172 +10,134 @@
 https://tfqhgzcziqnmbwkohbja.supabase.co/functions/v1/whatsapp-webhook
 ```
 
-Esta URL é a que você vai colar na configuração da Twilio.
+Esta URL é a que você vai colar no painel do Z-API.
 
 ---
 
-## 2. Conta Twilio + WhatsApp Business API
+## 2. Configurar Z-API
 
-### 2a. Criar conta Twilio
+### 2a. Criar conta
+1. Entre em [app.z-api.io](https://app.z-api.io)
+2. Crie conta com seu email
+3. Plano recomendado pra começar: **Plano Mensal** (R$ 99/mês com mensagens ilimitadas)
 
-1. Entre em [twilio.com/try-twilio](https://www.twilio.com/try-twilio)
-2. Crie conta com seu email (sem cartão ainda — $15 grátis pra começar)
-3. No console anote:
-   - **Account SID** (formato: AC...)
-   - **Auth Token** (clica em "View")
+### 2b. Conectar seu WhatsApp
+1. No painel Z-API → **+ Adicionar instância**
+2. Dá um nome (ex: `BTR-Paraiso-II`)
+3. Vai aparecer um **QR code** na tela
+4. No seu celular WhatsApp → ⋮ (3 pontinhos) → **Aparelhos conectados** → **Conectar aparelho** → escaneia o QR
+5. Pronto — seu número está conectado ao Z-API
 
-### 2b. Habilitar WhatsApp Business
+### 2c. Pegar as credenciais
+No painel da instância, **anote estes 3 valores**:
+- **Instance ID** (algo como `3D4F5A6B7C8D9E0F1A2B3C4D5E6F7G8H`)
+- **Token** (algo como `A1B2C3D4E5F6...`)
+- **Client-Token** (em Segurança → Token de Segurança/Account Security)
 
-Opção A — **WhatsApp Sandbox** (5 min, pra testar):
-1. Console → Develop → Messaging → Try it out → **Send a WhatsApp message**
-2. Anote o número sandbox: `whatsapp:+14155238886`
-3. Do seu celular, envie a mensagem `join <code-mostrado>` pra esse número
-4. Pronto pra testar! (limita a 72h de janela por usuário)
+### 2d. Configurar webhook
+No painel da instância → menu lateral **Webhooks**:
 
-Opção B — **Número próprio BR** (3-7 dias, produção):
-1. Console → Phone Numbers → Buy a Number → filtrar "Brazil" + "SMS, MMS, Voice"
-2. Comprar (~US$ 1,15/mês)
-3. Messaging → Senders → WhatsApp → "Bring your own number"
-4. Submit Meta Business verification (envia documentos OL Tree)
-5. Aguardar aprovação Meta (1-7 dias)
-6. Anote o número com prefixo: `whatsapp:+5562XXXXXXX`
-
-### 2c. Configurar Webhook
-
-1. Console → Messaging → Settings → **WhatsApp Sandbox Settings** (ou seu número)
-2. Em "When a message comes in":
-   - **URL**: `https://tfqhgzcziqnmbwkohbja.supabase.co/functions/v1/whatsapp-webhook`
-   - **Method**: `HTTP POST`
-3. Save
+1. **Ao receber mensagem (on-message-received)**: cole a URL
+   ```
+   https://tfqhgzcziqnmbwkohbja.supabase.co/functions/v1/whatsapp-webhook
+   ```
+2. **Notificar enviadas por mim**: ❌ desabilite (já filtramos por `fromMe` no código)
+3. Salve
 
 ---
 
-## 3. Conta OpenAI (Whisper para transcrição de áudio)
+## 3. Cadastre os secrets no Supabase
 
-1. Crie conta em [platform.openai.com](https://platform.openai.com)
-2. Adicione cartão (compre $5 pra começar)
-3. Settings → **API Keys** → Create new secret key
-4. **Whisper** custa ~US$ 0,006/min (R$ 0,03/min de áudio)
+Entre em [Edge Function Secrets](https://supabase.com/dashboard/project/tfqhgzcziqnmbwkohbja/settings/functions) e adicione:
 
----
-
-## 4. Conta Anthropic (Claude para estruturar RDO)
-
-1. Você disse que vai criar uma chave dedicada. Entre em [console.anthropic.com](https://console.anthropic.com)
-2. **API Keys** → Create Key → name: "BTR Paraíso II"
-3. Recomendo configurar limite de gasto mensal (Settings → Limits → US$ 20)
-4. **Claude Sonnet** custa ~US$ 0,003 por RDO estruturado
-
----
-
-## 5. Configurar Secrets no Supabase
-
-Depois de obter todas as credenciais, me passe que eu rodo:
-
-```sql
--- Como dono no Supabase
-TWILIO_ACCOUNT_SID=AC...
-TWILIO_AUTH_TOKEN=...
-TWILIO_WHATSAPP_FROM=whatsapp:+14155238886  -- ou seu número próprio
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
+```
+ZAPI_INSTANCE_ID=3D4F5A6B7C8D9E0F1A2B3C4D5E6F7G8H
+ZAPI_TOKEN=A1B2C3D4E5F6...
+ZAPI_CLIENT_TOKEN=Fb1234abcd5678...
 ```
 
-**OU** você mesmo configura no dashboard:
-1. https://supabase.com/dashboard/project/tfqhgzcziqnmbwkohbja/settings/functions
-2. Section **Edge Function Secrets** → Add new secret (uma por uma)
+(os outros 2 que você já cadastrou: `OPENAI_API_KEY` + `ANTHROPIC_API_KEY` continuam valendo)
 
 ---
 
-## 6. Cadastrar números autorizados
+## 4. Cadastrar números autorizados
 
-No SQL Editor do Supabase, rode (substituindo pelo número real do Osias):
+Roda no SQL Editor do Supabase substituindo pelo SEU número:
 
 ```sql
--- Cadastrar você (já é dono, só adiciona o número)
 UPDATE perfis
-SET whatsapp_numero = '+5511XXXXXXXXX'  -- com +55 e DDD
+SET whatsapp_numero = '+5562999999999'  -- seu número com +55 e DDD
 WHERE email = 'ercilio@olive.inc';
+```
 
--- Adicionar Osias (precisa criar conta antes em /login.html)
+Quando o **Osias** criar conta em /login.html, te aviso pra rodar:
+```sql
 UPDATE perfis
-SET whatsapp_numero = '+556299XXXXXXXX',
-    papel = 'mestre'
+SET whatsapp_numero = '+5562988888888',
+    papel = 'mestre',
+    nome = 'Osias Neris Rodrigues Santos'
 WHERE email = 'osias@email.com';
 ```
 
 ---
 
-## 7. Teste end-to-end
+## 5. Teste end-to-end
 
-1. Do seu celular cadastrado, mande pro número Twilio:
-   ```
-   Hoje fizemos a impermeabilização do muro de arrimo.
-   Equipe Josias + 1 ajudante.
-   Material usado: lona preta + Betumax.
-   Previsão: pronto sexta.
-   ```
-   E anexe 2-3 fotos.
+Do seu celular cadastrado, mande pro **seu próprio WhatsApp** (que está conectado ao Z-API):
 
-2. O bot deve responder em ~3s:
-   ```
-   📥 Recebi 3 mídia(s). Processando...
-   ```
+> Hoje fizemos a impermeabilização do muro de arrimo.
+> Equipe Josias + 1 ajudante.
+> Material usado: lona preta + Betumax.
+> Previsão: pronto sexta.
 
-3. Após ~60s (buffer + Whisper + Claude):
-   ```
-   ✅ RDO estruturado!
-   📅 Data: 2026-05-28
-   📝 Atividades: 1
-   📷 Fotos: 3
-   ⚠️ Ocorrências: 0
+E anexa 2-3 fotos.
 
-   👉 Revisar e aprovar:
-   https://btr-paraiso-ii.netlify.app/admin-rdos.html?draft=123
-   ```
-
-4. Você abre o link → revisa → "✅ Aprovar e Criar RDO"
-5. RDO #X aparece em `/rdos.html`, fotos em `/galeria.html`, atividades alimentam KPIs
+Sequência esperada:
+1. **~3s**: bot responde `📥 Recebi 3 mídia(s). Processando...`
+2. **~60s** (buffer + Whisper + Claude): bot responde com resumo + link
+3. Você abre o link → revisa em /admin-rdos.html → "✅ Aprovar e Criar RDO"
 
 ---
 
 ## 💰 Custos esperados (1 RDO/dia × 30 dias)
 
-| Item | Custo unitário | Mensal |
-|---|---|---|
-| Claude Sonnet estruturar (~3k tokens) | US$ 0,003 | R$ 0,50 |
-| Whisper áudio (~1 min/RDO) | US$ 0,006 | R$ 0,90 |
-| Twilio número BR | — | US$ 1,15 (~R$ 6) |
-| Twilio msg in/out (Sandbox grátis, prod ~R$ 0,02/msg × 60) | — | R$ 1,20 |
-| Supabase Edge Function (500k invocações grátis) | — | R$ 0 |
-| **Total estimado** | | **~R$ 9/mês** |
+| Item | Custo |
+|---|---|
+| Z-API Plano Mensal | R$ 99/mês fixo |
+| Claude Sonnet 4.6 (~3k tokens) | ~R$ 0,02 por RDO |
+| Whisper áudio (~1 min/RDO) | ~R$ 0,03 por RDO |
+| Supabase Edge Function (500k invocações grátis) | R$ 0 |
+| **Total estimado** | **~R$ 100/mês fixo** |
 
-180 dias de obra: **~R$ 54** de custo total. Comparado com 180 RDOs manuais que tomam 15min cada (45h), o ROI é absurdo.
-
----
-
-## 🛡️ Segurança
-
-- Edge Function verifica **assinatura HMAC** do Twilio (rejeita requests falsos)
-- Verifica se o número está em `perfis.whatsapp_numero` E papel é dono/engenheiro/mestre
-- Service role key não vaza pro frontend (só na Edge Function)
-- Drafts ficam em quarentena até aprovação manual (você revê antes de virar RDO oficial)
+180 dias de obra: **~R$ 600 total**. Mas o Z-API serve pra qualquer projeto seu — Delivery Mates, Yamaha, etc — então o custo amortiza.
 
 ---
 
-## 🚧 Limitações conhecidas v1
+## ⚠️ Caveats Z-API
 
-1. **Buffer fixo de 60s**: se o Osias demora muito, pode criar 2 RDOs do mesmo dia. Solução futura: detectar "fim" pela mensagem
-2. **Sem confirmação intermediária**: se a IA errou etapa, você descobre só ao revisar. Aprovação manual mitiga
-3. **Não responde follow-up**: não dá pra mandar "muda a etapa 4 pra F4" — tem que editar manual
-4. **Sem retry automático**: se Claude/Whisper falham, marca como failed (você vê em `whatsapp_inbox.status = failed`)
+1. **WhatsApp Web**: tecnicamente roda sobre WhatsApp Web. Mantenha o celular conectado à internet (ou Bateria mínima). Se desconectar, o webhook para.
+2. **QR code re-pareamento**: A cada ~14 dias o WhatsApp pode pedir re-conexão. Vai no app.z-api.io → escaneia de novo
+3. **Risco de ban**: raro mas existe. Evite spam, mande mensagens "naturais"
+4. **Webhook IPs**: Z-API envia de IPs variáveis, então sem whitelist (só validamos via Client-Token)
 
 ---
 
-## 🚀 Próximos passos para você
+## 🛡️ Segurança implementada
 
-1. Crie conta na Twilio + OpenAI + Anthropic (~30 min)
-2. Me passa as 5 secrets
-3. Eu configuro na Edge Function + crio link com Twilio
-4. Testamos juntos com uma mensagem de exemplo
-5. Cadastra Osias (depois que ele tiver conta em /login.html)
+- Edge Function valida header `Client-Token` (rejeita requests sem token correto)
+- Verifica se número está em `perfis.whatsapp_numero` E papel é dono/engenheiro/mestre
+- Ignora mensagens `fromMe: true` (mensagens que você enviou) e `isGroup: true` (grupos)
+- Service role key não vaza pro frontend
+- Drafts ficam em quarentena até aprovação manual
+
+---
+
+## 🚀 Próximos passos pra você
+
+1. Criar conta Z-API + conectar WhatsApp via QR (5 min)
+2. Anotar Instance ID + Token + Client-Token
+3. Colar os 3 secrets no Supabase
+4. Configurar webhook on-message-received apontando pra Edge Function
+5. Rodar SQL pra cadastrar seu número em `perfis`
+6. Testar mandando mensagem do seu celular
+7. Me avisar se algo não funcionar
