@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="/assets/style.css?v=1779950500">
+<link rel="stylesheet" href="/assets/style.css?v=1780009000">
 </head>
 <body data-page="admin-rdos">
 <div id="original-content">
@@ -30,6 +30,21 @@
   .btn-reject { background: var(--danger); color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
   .btn-edit { background: var(--gray-200); color: var(--text); padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
   .ia-raw { font-family: monospace; font-size: 11px; background: #F9FAFB; padding: 12px; border-radius: 6px; max-height: 200px; overflow: auto; margin-top: 10px; display: none; }
+
+  /* Editor de atividades */
+  .edit-panel { display: none; margin-top: 12px; padding: 14px; background: #FFFBEB; border: 1px dashed #F59E0B; border-radius: 8px; }
+  .edit-panel.open { display: block; }
+  .edit-panel-title { font-weight: 600; font-size: 13px; color: #92400E; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .edit-row { display: grid; grid-template-columns: 110px 1fr 80px 110px 110px 110px 32px; gap: 6px; align-items: center; padding: 6px 0; border-top: 1px dashed #FDE68A; }
+  .edit-row:first-child { border-top: none; }
+  .edit-row input, .edit-row select { width: 100%; padding: 5px 6px; font-size: 12px; border: 1px solid #E5E7EB; border-radius: 4px; background: white; }
+  .edit-row input[type="number"] { text-align: right; }
+  .edit-row .btn-x { background: #FEE2E2; color: #991B1B; border: none; border-radius: 4px; padding: 4px 6px; cursor: pointer; font-weight: 700; }
+  .edit-header { display: grid; grid-template-columns: 110px 1fr 80px 110px 110px 110px 32px; gap: 6px; font-size: 10px; font-weight: 700; color: #92400E; text-transform: uppercase; padding-bottom: 4px; border-bottom: 1px solid #FDE68A; }
+  .edit-actions { margin-top: 10px; display: flex; gap: 8px; justify-content: flex-end; }
+  .btn-add { background: #DBEAFE; color: #1E40AF; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
+  .btn-save { background: #16A34A; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+  .btn-cancel { background: #E5E7EB; color: #374151; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
 </style>
 
 <div class="page-header">
@@ -60,15 +75,41 @@
 </div>
 
 </div>
-<script src="/assets/supabase-client.js?v=1779950500"></script>
-<script src="/assets/app.js?v=1779950500"></script>
+<script src="/assets/supabase-client.js?v=1780009000"></script>
+<script src="/assets/app.js?v=1780009000"></script>
 <script>
-function initPage() {
+// Cache de etapas pra dropdowns + cache de drafts em memória pro editor
+window.__etapasCache = [];
+window.__draftsCache = {};
+
+async function carregarEtapas() {
+  const sb = window.supabase;
+  const { data, error } = await sb.from('etapas').select('cod, nome').order('cod');
+  if (!error && data) {
+    // Ordenar: numéricas primeiro, depois F1..F7, depois T1
+    window.__etapasCache = data.sort((a, b) => {
+      const aN = parseInt(a.cod), bN = parseInt(b.cod);
+      if (!isNaN(aN) && !isNaN(bN)) return aN - bN;
+      if (!isNaN(aN)) return -1;
+      if (!isNaN(bN)) return 1;
+      return a.cod.localeCompare(b.cod);
+    });
+  }
+}
+
+function etapasOptionsHtml(selectedCod) {
+  return window.__etapasCache.map(e =>
+    `<option value="${e.cod}" data-nome="${e.nome.replace(/"/g, '&quot;')}" ${e.cod === selectedCod ? 'selected' : ''}>${e.cod} — ${e.nome}</option>`
+  ).join('');
+}
+
+async function initPage() {
   const D = window.DATA;
   if (!['dono','engenheiro','mestre'].includes(D.user.papel)) {
     document.querySelector('#original-content').innerHTML = '<div class="alert alert-warning"><div class="alert-icon">🔒</div><div class="alert-body"><div class="alert-title">Acesso negado</div>Apenas dono/engenheiro/mestre podem revisar RDOs IA.</div></div>';
     return;
   }
+  await carregarEtapas();
   reloadDrafts();
 }
 
@@ -100,7 +141,10 @@ window.reloadDrafts = async () => {
   // Renderizar drafts (pendentes primeiro)
   const ordenados = [...pendentes, ...data.filter(d => d.status !== 'pendente')];
   list.innerHTML = '';
+  // Resetar cache
+  window.__draftsCache = {};
   for (const draft of ordenados) {
+    window.__draftsCache[draft.id] = draft;
     const ia = draft.ia_response || {};
     const conf = (Number(draft.ia_confidence) || 0.85) * 100;
     const confCls = conf >= 80 ? 'conf-high' : conf >= 60 ? 'conf-med' : 'conf-low';
@@ -166,12 +210,15 @@ window.reloadDrafts = async () => {
         ${draft.status === 'pendente' ? `
           <button class="btn-reject" onclick="rejectDraft(${draft.id})">❌ Rejeitar</button>
           <button class="btn-edit" onclick="toggleRaw(${draft.id})">🔍 Ver JSON</button>
+          <button class="btn-edit" onclick="toggleEditor(${draft.id})">✏️ Editar Atividades</button>
           <button class="btn-approve" onclick="approveDraft(${draft.id})">✅ Aprovar e Criar RDO</button>
         ` : `
           <button class="btn-edit" onclick="toggleRaw(${draft.id})">🔍 Ver JSON</button>
           ${draft.rdo_id ? `<a href="/rdos.html" class="btn-edit" style="text-decoration:none;">Ver RDO criado →</a>` : ''}
         `}
       </div>
+
+      <div class="edit-panel" id="edit-${draft.id}"></div>
 
       <div class="ia-raw" id="raw-${draft.id}"><pre>${JSON.stringify(ia, null, 2)}</pre></div>
     `;
@@ -184,6 +231,136 @@ window.reloadDrafts = async () => {
 window.toggleRaw = (id) => {
   const el = document.getElementById('raw-' + id);
   el.style.display = el.style.display === 'block' ? 'none' : 'block';
+};
+
+// ───────── Editor de atividades ─────────
+const STATUS_OPCOES = ['Em Execução', 'Concluído', 'Pausado', 'Pendente', 'Planejado'];
+
+window.toggleEditor = (id) => {
+  const el = document.getElementById('edit-' + id);
+  if (el.classList.contains('open')) {
+    el.classList.remove('open');
+    el.innerHTML = '';
+    return;
+  }
+  renderEditor(id);
+};
+
+function renderEditor(id) {
+  const draft = window.__draftsCache[id];
+  if (!draft) return;
+  const ia = draft.ia_response || {};
+  const ativs = Array.isArray(ia.atividades) ? JSON.parse(JSON.stringify(ia.atividades)) : [];
+  // Estado de edição vive em window.__editState[id]
+  window.__editState = window.__editState || {};
+  window.__editState[id] = { atividades: ativs };
+  const el = document.getElementById('edit-' + id);
+  el.classList.add('open');
+  el.innerHTML = `
+    <div class="edit-panel-title">
+      <span>✏️ Editar atividades do RDO ${draft.numero_sugerido ? '#' + draft.numero_sugerido : '#' + draft.id}</span>
+      <span style="font-size:11px; color:#92400E; font-weight:400;">Mudanças ficam só no rascunho até você salvar</span>
+    </div>
+    <div class="edit-header">
+      <div>Etapa</div>
+      <div>Descrição</div>
+      <div>%</div>
+      <div>Status</div>
+      <div>MO (R$)</div>
+      <div>Material (R$)</div>
+      <div></div>
+    </div>
+    <div id="edit-rows-${id}"></div>
+    <div style="margin-top:8px;">
+      <button class="btn-add" onclick="addAtivRow(${id})">+ Adicionar atividade</button>
+    </div>
+    <div class="edit-actions">
+      <button class="btn-cancel" onclick="toggleEditor(${id})">Cancelar</button>
+      <button class="btn-save" onclick="saveAtividades(${id})">💾 Salvar atividades no rascunho</button>
+    </div>
+  `;
+  renderEditRows(id);
+}
+
+function renderEditRows(id) {
+  const rows = document.getElementById('edit-rows-' + id);
+  const state = window.__editState[id];
+  if (!state) return;
+  if (state.atividades.length === 0) {
+    rows.innerHTML = '<div style="padding:10px; color:#92400E; font-size:12px; text-align:center;">Nenhuma atividade. Clique em "+ Adicionar atividade" pra começar.</div>';
+    return;
+  }
+  const statusOpts = STATUS_OPCOES.map(s => `<option value="${s}">${s}</option>`).join('');
+  rows.innerHTML = state.atividades.map((a, idx) => `
+    <div class="edit-row">
+      <select onchange="updateAtiv(${id}, ${idx}, 'cod_etapa', this.value); updateAtivNome(${id}, ${idx}, this)">
+        <option value="">— Etapa —</option>
+        ${etapasOptionsHtml(a.cod_etapa || '')}
+      </select>
+      <input type="text" placeholder="Descrição..." value="${(a.descricao || '').replace(/"/g, '&quot;')}" oninput="updateAtiv(${id}, ${idx}, 'descricao', this.value)">
+      <input type="number" min="0" max="100" step="1" placeholder="%" value="${a.pct_executado ? Math.round((Number(a.pct_executado) <= 1 ? a.pct_executado * 100 : a.pct_executado)) : ''}" oninput="updateAtivPct(${id}, ${idx}, this.value)">
+      <select onchange="updateAtiv(${id}, ${idx}, 'status', this.value)">
+        <option value="">— Status —</option>
+        ${STATUS_OPCOES.map(s => `<option value="${s}" ${a.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+      </select>
+      <input type="number" min="0" step="0.01" placeholder="0" value="${a.mao_obra_valor || ''}" oninput="updateAtivNum(${id}, ${idx}, 'mao_obra_valor', this.value)">
+      <input type="number" min="0" step="0.01" placeholder="0" value="${a.material_valor || ''}" oninput="updateAtivNum(${id}, ${idx}, 'material_valor', this.value)">
+      <button class="btn-x" onclick="removeAtivRow(${id}, ${idx})" title="Remover">✕</button>
+    </div>
+  `).join('');
+}
+
+window.updateAtiv = (id, idx, campo, val) => {
+  window.__editState[id].atividades[idx][campo] = val;
+};
+window.updateAtivPct = (id, idx, val) => {
+  // Sempre guardar como 0..1 (fração) que é o formato esperado por ia_response
+  const v = Number(val);
+  if (!val || isNaN(v)) { window.__editState[id].atividades[idx].pct_executado = null; return; }
+  window.__editState[id].atividades[idx].pct_executado = Math.max(0, Math.min(100, v)) / 100;
+};
+window.updateAtivNum = (id, idx, campo, val) => {
+  const v = Number(val);
+  window.__editState[id].atividades[idx][campo] = isNaN(v) ? null : v;
+};
+window.updateAtivNome = (id, idx, sel) => {
+  const opt = sel.selectedOptions[0];
+  const nome = opt?.dataset?.nome || '';
+  window.__editState[id].atividades[idx].etapa_nome = nome;
+};
+
+window.addAtivRow = (id) => {
+  window.__editState[id].atividades.push({
+    cod_etapa: '', etapa_nome: '', descricao: '', pct_executado: null, status: 'Em Execução',
+    mao_obra_valor: null, material_valor: null
+  });
+  renderEditRows(id);
+};
+
+window.removeAtivRow = (id, idx) => {
+  if (!confirm('Remover esta atividade do rascunho?')) return;
+  window.__editState[id].atividades.splice(idx, 1);
+  renderEditRows(id);
+};
+
+window.saveAtividades = async (id) => {
+  const state = window.__editState[id];
+  if (!state) return;
+  // Validar: cada atividade precisa de cod_etapa
+  const incompletas = state.atividades.filter(a => !a.cod_etapa);
+  if (incompletas.length > 0) {
+    if (!confirm(`${incompletas.length} atividade(s) sem etapa selecionada vão ficar sem código. Salvar mesmo assim?`)) return;
+  }
+  const sb = window.supabase;
+  const draft = window.__draftsCache[id];
+  const newIa = { ...(draft.ia_response || {}), atividades: state.atividades };
+  const { error } = await sb.from('rdos_drafts').update({ ia_response: newIa }).eq('id', id);
+  if (error) { alert('Erro salvando: ' + error.message); return; }
+  alert(`✅ ${state.atividades.length} atividade(s) salvas no rascunho. Agora você pode aprovar.`);
+  // Atualiza o draft local pro approve usar
+  draft.ia_response = newIa;
+  // Re-renderiza o card pra mostrar atividades atualizadas
+  reloadDrafts();
 };
 
 window.approveDraft = async (id) => {
