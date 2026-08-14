@@ -101,7 +101,10 @@
         orcado: Number(e.orcado), realizado,
         pct: e.orcado > 0 ? realizado / Number(e.orcado) : 0,
         saldo: Number(e.orcado) - realizado,
-        abc: e.abc, status: e.status
+        abc: e.abc, status: e.status,
+        pct_fisico: (e.pct_fisico === null || e.pct_fisico === undefined) ? null : Number(e.pct_fisico),
+        pct_data: e.pct_data || null,
+        pct_fonte: e.pct_fonte || null
       };
     });
 

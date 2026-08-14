@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Insights — BTR Paraíso II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/style.css?v=1779916947">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  .tri{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1.5px solid var(--primary);
+       border-radius:var(--radius);overflow:hidden;margin:4px 0 14px}
+  .tri > div{padding:16px 18px;border-right:1px solid var(--gray-200)}
+  .tri > div:last-child{border-right:none}
+  .tri .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500);font-weight:700}
+  .tri .v{font-size:26px;font-weight:700;margin-top:4px;letter-spacing:-.02em;line-height:1.1}
+  .tri .f{font-size:12px;color:var(--gray-500);margin-top:4px;line-height:1.45}
+  .tri .bar{height:6px;background:var(--gray-100);border-radius:3px;margin-top:9px;overflow:hidden}
+  .tri .bar span{display:block;height:100%;border-radius:3px}
+
+  .find{border:1px solid var(--gray-200);border-left-width:4px;border-radius:var(--radius);
+        padding:14px 16px;margin-bottom:12px;background:var(--card)}
+  .find.red{border-left-color:var(--danger)}
+  .find.amber{border-left-color:var(--warning)}
+  .find.green{border-left-color:var(--success)}
+  .find h4{margin:0 0 6px;font-size:15px;font-weight:700;color:var(--text);line-height:1.35}
+  .find p{margin:0 0 8px;font-size:13.5px;line-height:1.6;color:var(--gray-700)}
+  .find p:last-child{margin-bottom:0}
+  .find .tag{display:inline-block;font-size:10.5px;font-weight:700;text-transform:uppercase;
+             letter-spacing:.05em;padding:2px 7px;border-radius:4px;margin-bottom:7px}
+  .find.red .tag{background:var(--danger-bg);color:var(--danger)}
+  .find.amber .tag{background:var(--warning-bg);color:var(--warning)}
+  .find.green .tag{background:var(--success-bg);color:var(--success)}
+  .find .ask{margin-top:9px;padding-top:9px;border-top:1px dashed var(--gray-200);
+             font-size:12.5px;color:var(--gray-600)}
+  .find .ask b{color:var(--text)}
+
+  .delta{display:inline-block;font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;
+         background:var(--success-bg);color:var(--success);margin-left:6px;vertical-align:middle}
+  .delta.dn{background:var(--danger-bg);color:var(--danger)}
+
+  table.pf{width:100%;border-collapse:collapse;font-size:13px}
+  table.pf th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;
+              color:var(--gray-500);font-weight:700;padding:8px 8px;border-bottom:1.5px solid var(--gray-200)}
+  table.pf th.n{text-align:right}
+  table.pf td{padding:7px 8px;border-bottom:1px solid var(--gray-100);color:var(--gray-700)}
+  table.pf td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+  table.pf td.cod{color:var(--gray-400);font-variant-numeric:tabular-nums;width:38px}
+  table.pf .mini{display:inline-block;width:64px;height:6px;background:var(--gray-100);
+                 border-radius:3px;overflow:hidden;vertical-align:middle;margin-left:8px}
+  table.pf .mini i{display:block;height:100%;background:var(--primary)}
+  table.pf tr.z td{color:var(--gray-400)}
+
+  .qlist{list-style:none;padding:0;margin:0}
+  .qlist li{padding:11px 0 11px 26px;border-bottom:1px solid var(--gray-100);font-size:13.5px;
+            line-height:1.55;position:relative;color:var(--gray-700)}
+  .qlist li:last-child{border-bottom:none}
+  .qlist li:before{content:'?';position:absolute;left:0;top:11px;width:17px;height:17px;
+                   border-radius:50%;background:var(--warning-bg);color:var(--warning);
+                   font-size:11px;font-weight:700;text-align:center;line-height:17px}
+  .qlist li b{color:var(--text)}
+  .src{font-size:11.5px;color:var(--gray-400);margin-top:10px;font-style:italic}
+  @media(max-width:760px){.tri{grid-template-columns:1fr}.tri>div{border-right:none;border-bottom:1px solid var(--gray-200)}}
+</style>
+</head>
+<body data-page="insights">
+<div id="original-content">
+<div class="page-header">
+  <div class="page-title">🔎 Insights</div>
+  <div class="page-subtitle">Leitura crítica da obra — o que os números e as fotos dizem, e o que ainda não está respondido</div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">
+    <div class="card-title">Avanço físico × dinheiro × prazo</div>
+    <div class="card-meta" id="triData">—</div>
+  </div>
+  <div class="tri" id="tri"></div>
+  <p class="text-small text-muted" style="margin:0">
+    Três recortes que medem coisas diferentes e são todos verdadeiros ao mesmo tempo. O que importa é a distância entre eles:
+    o dinheiro anda mais rápido que o serviço, e o relógio anda mais rápido que os dois.
+  </p>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">
+    <div class="card-title">📸 O que as 30 fotos de drone de 13/08 mostraram</div>
+    <div class="card-meta">lidas uma a uma em 14/08</div>
+  </div>
+
+  <div class="find green">
+    <span class="tag">confirmado</span>
+    <h4>O reboco que aparece nas aéreas não é fachada</h4>
+    <p>A face externa das paredes das duas casas continua inteiramente em tijolo cerâmico aparente, do baldrame ao topo, sem chapisco. O reboco cinza visível de cima está na face interna da platibanda e na parte da parede <b>acima da linha do futuro telhado</b>.</p>
+    <p>A borda inferior serrilhada do reboco marca exatamente essa linha e confirma o critério de projeto: abaixo dela fica sob o telhado e não se reboca. Cobertura estimada: ~70% do perímetro das duas casas, mais os dois reservatórios elevados rebocados nas quatro faces.</p>
+    <div class="ask"><b>Efeito no controle:</b> a frente bandeirola andou muito e é serviço real, mas a Etapa 10 — Revestimentos Externos / Fachada não começou. Percentual corrigido de 15% para 3%.</div>
+  </div>
+
+  <div class="find amber">
+    <span class="tag">falta uma laje</span>
+    <h4>O bloco dos fundos das duas casas ainda está aberto ao céu</h4>
+    <p>Área de serviço e os ambientes encostados na divisa: paredes de pé até a cinta, esperas de ferro dos pilares projetadas para cima, ambiente sem laje e sem fôrma montada. Aparece em seis tomadas diferentes. Hoje serve de depósito da madeira de fôrma desmontada.</p>
+    <div class="ask"><b>Em aberto:</b> este trecho entra no prazo de 29/10 ou fica para depois do habite-se? Se ficar, sai do caminho crítico e o avanço da estrutura sobe.</div>
+  </div>
+
+  <div class="find red">
+    <span class="tag">achado novo</span>
+    <h4>A calha de alvenaria não tem descida de água nem revestimento definido</h4>
+    <p>Corre ao longo da platibanda das duas casas uma calha de alvenaria de 30 a 40 cm, com berço e as duas faces internas já rebocadas, visível com nitidez em seis tomadas. Em nenhuma imagem aparece tubo, bocal ou furo de descida, e não há sinal de manta ou chapa.</p>
+    <p>Isto <b>não</b> é a impermeabilização da laje, já esclarecida como desnecessária por ficar sob o telhado. Laje sob telhado é água de superfície; calha é <b>água concentrada</b>. Argamassa pura trinca na primeira dilatação térmica e vaza por dentro da platibanda.</p>
+    <div class="ask"><b>Janela que fecha:</b> depois do telhado montado não se chega mais na calha. Resolver antes da telha subir.</div>
+  </div>
+
+  <div class="find red">
+    <span class="tag">material</span>
+    <h4>Telha nenhuma no canteiro, sexto dia</h4>
+    <p>Em 30 fotos cobrindo todo o terreno, nenhuma telha, terça, caibro ou ripa da obra. As telhas visíveis são todas dos telhados vizinhos. Há, sim, fiadas de lajota cerâmica estocadas sobre o telhado metálico do vizinho — destino ainda não confirmado.</p>
+    <div class="ask"><b>Chuva em Goiás começa em outubro.</b> A cobertura é a etapa de R$ 30.000 que ainda não saiu do zero.</div>
+  </div>
+
+  <div class="find amber">
+    <span class="tag">corrigido</span>
+    <h4>As vigotas são a estrutura do telhado, não uma laje</h4>
+    <p>Correção do proprietário em 14/08: as 37 vigotas de concreto do pedido substituem terça e caibro — <b>não há madeiramento nesta obra</b>. Isso põe o pedido inteiro na Etapa 5 Cobertura e faz o valor fechar: 52 telhas a R$ 100 dão R$ 5.200, e cerca de 148 m lineares de vigota a R$ 22–28/m dão R$ 3.300 a 4.150.</p>
+    <div class="ask"><b>Pergunta técnica nova, para o RT:</b> vigota de concreto pesa muito mais que terça de madeira. A cinta da platibanda foi dimensionada para esse carregamento? E como a telha de fibrocimento fixa em apoio de concreto?</div>
+  </div>
+
+  <div class="find amber">
+    <span class="tag">compra do proprietário</span>
+    <h4>Os dois reservatórios estão prontos, rebocados — e vazios</h4>
+    <p>A alvenaria dos reservatórios elevados está concluída nas quatro faces nas duas casas. A caixa d'água em si não está no lugar. A compra é do proprietário, via gestor.</p>
+    <div class="ask"><b>A definir:</b> capacidade — o Anexo I do COT da Caixa exige mínimo 500 litros de água potável, e são duas casas com medição individualizada — e para quando o empreiteiro precisa dela. Leitura de partida: antes do telhado, porque depois o acesso muda.</div>
+  </div>
+
+  <p class="src">Fonte: voo de drone de 13/08/2026, 30 imagens, inspeção individual. Imagem comprova avanço, não comprova conformidade — prumo, esquadro, espessura de reboco e cura da laje não se leem por foto.</p>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📊 Avanço físico por etapa</div>
+      <div class="card-meta" id="pfMeta">—</div>
+    </div>
+    <div style="max-height:520px;overflow:auto">
+      <table class="pf" id="tblPf"><thead><tr>
+        <th style="width:38px">#</th><th>Etapa</th><th class="n">Físico</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><div class="card-title">❓ Perguntas ainda sem resposta</div></div>
+    <ul class="qlist">
+      <li><b>A calha</b> recebe manta, membrana ou chapa — ou fica só em argamassa? E onde ficam as descidas de água pluvial?</li>
+      <li><b>Os pilaretes da bandeirola</b> foram concretados antes do reboco? As fôrmas estavam montadas e vazias em 11/08 e o reboco seguiu em frente.</li>
+      <li><b>A laje do bloco dos fundos</b> entra no prazo de 29/10 ou fica para depois do habite-se?</li>
+      <li><b>Que dia o telhado fecha</b>, contando chegada de material, montagem da estrutura em vigota e assentamento?</li>
+      <li><b>A cinta da platibanda</b> foi dimensionada para o peso da estrutura em vigota de concreto? E como a telha fixa no concreto?</li>
+      <li><b>Para quando</b> o empreiteiro precisa das caixas d'água, e de que capacidade cada uma?</li>
+      <li><b>As lajotas cerâmicas</b> estocadas no telhado do vizinho são desta obra? Para a laje dos fundos ou para o enchimento entre vigotas?</li>
+      <li><b>Os R$ 5.500 da F2</b> — Rufos e calhas — cobrem o quê, se a calha de alvenaria é do empreiteiro dentro do preço por m²?</li>
+      <li><b>O escoramento</b> da laje concretada em 07/08 segue completo? Vista aérea não alcança o pé-direito — só se confere em campo.</li>
+    </ul>
+  </div>
+</div>
+</div>
+
+<script src="/assets/supabase-client.js?v=1779916947"></script>
+<script src="/assets/app.js?v=1779916947"></script>
+<script>
+function initPage() {
+  const D = window.DATA;
+  const etapas = [].concat(D.etapas_nbr || [], D.itens_fora || []);
+
+  // ---------- avanço físico ponderado (exclui terreno) ----------
+  let orc = 0, exec = 0, temPf = false, dataPf = null;
+  etapas.forEach(e => {
+    const o = Number(e.orcado) || 0;
+    const pf = (e.pct_fisico === null || e.pct_fisico === undefined) ? null : Number(e.pct_fisico);
+    orc += o;
+    if (pf !== null) { temPf = true; exec += o * pf / 100; }
+    if (e.pct_data && (!dataPf || e.pct_data > dataPf)) dataPf = e.pct_data;
+  });
+  const pctFis = (temPf && orc > 0) ? (exec / orc) : null;
+
+  // ---------- dinheiro e prazo ----------
+  const orcTotalObra = orc > 0 ? orc : (D.kpis.orcamento_total || 0);
+  const realizado = Number(D.kpis.realizado) || 0;
+  const pctDin = orcTotalObra > 0 ? realizado / orcTotalObra : 0;
+  const t = D.tempo || {};
+  const pctTempo = Number(t.pct_tempo) || 0;
+
+  const p1 = pctFis !== null ? pctFis : 0;
+  const rel = (a, b) => (b > 0 && a > 0) ? (a / b).toFixed(2).replace('.', ',') + 'x' : '—';
+
+  document.getElementById('triData').textContent =
+    dataPf ? 'avaliação de ' + fmt.date(dataPf) : 'avaliação das 27 etapas';
+
+  document.getElementById('tri').innerHTML = `
+    <div>
+      <div class="l">Serviço executado</div>
+      <div class="v">${(p1*100).toFixed(1).replace('.', ',')}%</div>
+      <div class="f">${fmt.money(exec)} de ${fmt.money(orcTotalObra)}<br>as 27 etapas, ponderadas pelo orçamento</div>
+      <div class="bar"><span style="width:${(p1*100).toFixed(1)}%;background:var(--primary)"></span></div>
+    </div>
+    <div>
+      <div class="l">Dinheiro gasto</div>
+      <div class="v">${(pctDin*100).toFixed(1).replace('.', ',')}%</div>
+      <div class="f">${fmt.money(realizado)} de ${fmt.money(orcTotalObra)}<br><b>${rel(pctDin, p1)}</b> à frente do serviço</div>
+      <div class="bar"><span style="width:${Math.min(100,pctDin*100).toFixed(1)}%;background:var(--warning)"></span></div>
+    </div>
+    <div>
+      <div class="l">Prazo decorrido</div>
+      <div class="v">${(pctTempo*100).toFixed(1).replace('.', ',')}%</div>
+      <div class="f">dia ${t.decorridos || '—'} de ${t.total || '—'} · faltam ${t.restantes || '—'} dias<br><b>${rel(pctTempo, p1)}</b> à frente do serviço</div>
+      <div class="bar"><span style="width:${Math.min(100,pctTempo*100).toFixed(1)}%;background:var(--danger)"></span></div>
+    </div>`;
+
+  // ---------- tabela por etapa ----------
+  const comPf = etapas.filter(e => e.pct_fisico !== null && e.pct_fisico !== undefined);
+  document.getElementById('pfMeta').textContent = comPf.length + ' de ' + etapas.length + ' etapas avaliadas';
+  const tb = document.querySelector('#tblPf tbody');
+  tb.innerHTML = etapas.map(e => {
+    const pf = (e.pct_fisico === null || e.pct_fisico === undefined) ? null : Number(e.pct_fisico);
+    const z = (pf === 0) ? ' class="z"' : '';
+    const val = pf === null ? '—' : pf.toFixed(0) + '%';
+    const bar = pf === null ? '' : `<span class="mini"><i style="width:${pf}%"></i></span>`;
+    return `<tr${z}><td class="cod">${e.cod}</td><td>${e.nome}</td><td class="n">${val}${bar}</td></tr>`;
+  }).join('');
+}
+</script>
+</body>
+</html>

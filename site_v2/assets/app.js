@@ -51,6 +51,7 @@ function buildLayout() {
     { section: 'GESTÃO' },
     { id: 'compliance', href: '/compliance.html', label: 'Compliance', icon: '⚖️', count: D.compliance.length },
     { id: 'riscos', href: '/riscos.html', label: 'Riscos & Ocorrências', icon: '⚠️', count: D.ocorrencias.length, alert: D.ocorrencias.length > 0 },
+    { id: 'insights', href: '/insights.html', label: 'Insights', icon: '🔎' },
     { id: 'btr-roi', href: '/btr-roi.html', label: 'BTR / ROI', icon: '📈' },
     { id: 'documentos', href: '/documentos.html', label: 'Documentos', icon: '📂' },
     { id: 'mobile', href: '/mobile.html', label: 'Vista Mobile', icon: '📱' },
