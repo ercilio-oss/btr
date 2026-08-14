@@ -31,19 +31,42 @@
   }
 
   // ============================================================
+  // OBRAS — lista e obra ativa (persistida no navegador)
+  // ============================================================
+  const OBRA_KEY = 'btr_obra_id';
+  let OBRAS = [], OBRA = null, OBRA_ID = 1;
+  try {
+    const { data: obrasData } = await supabase.from('obras')
+      .select('*').neq('status', 'encerrada').order('id');
+    OBRAS = obrasData || [];
+    let saved = null;
+    try { saved = Number(localStorage.getItem(OBRA_KEY)) || null; } catch (e) {}
+    OBRA = OBRAS.find(o => o.id === saved) || OBRAS.find(o => o.id === 1) || OBRAS[0] || null;
+    OBRA_ID = OBRA ? OBRA.id : 1;
+  } catch (e) {
+    console.warn('[btr] nao consegui carregar obras, usando obra 1', e);
+  }
+  window.OBRAS = OBRAS;
+  window.OBRA = OBRA;
+  window.OBRA_ID = OBRA_ID;
+  window.setObra = function (id) {
+    try { localStorage.setItem(OBRA_KEY, String(id)); } catch (e) {}
+    window.location.reload();
+  };
+
+  // ============================================================
   // CARREGAR TUDO DO BANCO
   // ============================================================
   try {
-    const [etapas, rdos, atividades, pagamentos, ocorrencias, compliance, cronograma, aquisicao, kpis, config, perfil, maoObra, fornMaster] = await Promise.all([
-      supabase.from('etapas').select('*').order('ordem'),
-      supabase.from('rdos').select('*').order('data', { ascending: false }),
-      supabase.from('atividades').select('*').order('data', { ascending: false }),
-      supabase.from('pagamentos').select('*').order('data', { ascending: false }),
+    const [etapas, rdos, atividades, pagamentos, ocorrencias, compliance, cronograma, aquisicao, config, perfil, maoObra, fornMaster] = await Promise.all([
+      supabase.from('etapas').select('*').eq('obra_id', OBRA_ID).order('ordem'),
+      supabase.from('rdos').select('*').eq('obra_id', OBRA_ID).order('data', { ascending: false }),
+      supabase.from('atividades').select('*').eq('obra_id', OBRA_ID).order('data', { ascending: false }),
+      supabase.from('pagamentos').select('*').eq('obra_id', OBRA_ID).order('data', { ascending: false }),
       supabase.from('ocorrencias').select('*').order('data', { ascending: false }),
       supabase.from('compliance').select('*').order('id'),
       supabase.from('cronograma_mensal').select('*').order('ordem'),
       supabase.from('aquisicao').select('*'),
-      supabase.from('v_kpis').select('*').single(),
       supabase.from('config_obra').select('*'),
       supabase.from('perfis').select('*').eq('id', session.user.id).single(),
       supabase.from('mao_obra').select('*').order('data', { ascending: false }),
@@ -82,11 +105,45 @@
       alvara: cfg.alvara || ''
     };
 
+    // A obra ativa manda no meta. Obra sem data nao inventa data da PAR2-B-12.
+    if (OBRA) {
+      meta.obra_id   = OBRA.id;
+      meta.obra_cod  = OBRA.cod;
+      meta.empreendimento = OBRA.nome || meta.empreendimento;
+      meta.endereco  = OBRA.endereco || '—';
+      meta.moeda     = OBRA.moeda || 'BRL';
+      meta.pais      = OBRA.pais || 'BR';
+      meta.fase      = OBRA.fase || '';
+      meta.status_obra = OBRA.status || '';
+      meta.observacao  = OBRA.observacao || '';
+      meta.n_unidades  = Number(OBRA.unidades) || (OBRA.id === 1 ? meta.n_unidades : 1);
+      meta.area_total  = OBRA.area_m2 !== null && OBRA.area_m2 !== undefined
+                          ? Number(OBRA.area_m2)
+                          : (OBRA.id === 1 ? meta.area_total : 0);
+      meta.data_inicio  = OBRA.data_inicio  || (OBRA.id === 1 ? meta.data_inicio  : null);
+      meta.data_entrega = OBRA.data_entrega || (OBRA.id === 1 ? meta.data_entrega : null);
+      if (OBRA.id !== 1) {
+        meta.area_terreno = 0; meta.area_casa_1 = 0; meta.area_casa_2 = 0;
+        meta.empreiteiro = ''; meta.procurador = ''; meta.rt = '';
+      }
+    }
+
     // ============================================================
     // KPIs (da view) + cálculos derivados
     // ============================================================
-    const k = kpis.data || {};
-    const orcTotal = Number(k.orcamento_total) || 571800;
+    // Antes vinha da view v_kpis, que somava TODAS as obras. Agora calcula
+    // da obra ativa, com o mesmo criterio de antes: orcado inclui o terreno.
+    const _sum = (arr, f) => (arr || []).reduce((s, x) => s + (Number(f(x)) || 0), 0);
+    const _rdosArr = rdos.data || [];
+    const k = {
+      orcamento_total: _sum(etapas.data, e => e.orcado),
+      realizado: _sum(atividades.data, a => a.total),
+      total_rdos: _rdosArr.length,
+      ultimo_rdo: _rdosArr.reduce((m, r) => Math.max(m, Number(r.numero) || 0), 0),
+      ultima_data: _rdosArr.reduce((m, r) => (!m || r.data > m) ? r.data : m, null)
+    };
+    k.saldo = k.orcamento_total - k.realizado;
+    const orcTotal = Number(k.orcamento_total) || 0;
     const realiz = Number(k.realizado) || 0;
     const pctFisico = orcTotal > 0 ? realiz / orcTotal : 0;
 
@@ -119,18 +176,19 @@
 
     // tempo: dias decorridos/restantes
     const hoje = new Date();
-    const inicio = new Date(meta.data_inicio);
-    const entrega = new Date(meta.data_entrega);
+    const temPrazo = !!(meta.data_inicio && meta.data_entrega);
+    const inicio = temPrazo ? new Date(meta.data_inicio) : null;
+    const entrega = temPrazo ? new Date(meta.data_entrega) : null;
     const MS = 1000 * 60 * 60 * 24;
-    const decorridos = Math.max(0, Math.floor((hoje - inicio) / MS));
-    const total = Math.max(1, Math.floor((entrega - inicio) / MS));
-    const restantes = Math.max(0, Math.floor((entrega - hoje) / MS));
+    const decorridos = temPrazo ? Math.max(0, Math.floor((hoje - inicio) / MS)) : 0;
+    const total = temPrazo ? Math.max(1, Math.floor((entrega - inicio) / MS)) : 0;
+    const restantes = temPrazo ? Math.max(0, Math.floor((entrega - hoje) / MS)) : 0;
     const tempo = {
       hoje: hoje.toISOString().substring(0,10),
       inicio: meta.data_inicio,
       entrega: meta.data_entrega,
-      decorridos, total, restantes,
-      pct_tempo: decorridos / total
+      decorridos, total, restantes, tem_prazo: temPrazo,
+      pct_tempo: total > 0 ? decorridos / total : 0
     };
 
     // comp_stats: contagem de compliance por status
@@ -180,6 +238,8 @@
     // window.DATA — shape idêntico ao data.js antigo
     // ============================================================
     window.DATA = {
+      obra: OBRA,
+      obras: OBRAS,
       meta,
       kpis: {
         orcamento_total: orcTotal,

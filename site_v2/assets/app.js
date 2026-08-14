@@ -6,9 +6,13 @@
 // ============================================================
 // FORMATTERS
 // ============================================================
+window.moedaSimbolo = () => {
+  const m = (window.OBRA && window.OBRA.moeda) || 'BRL';
+  return m === 'GBP' ? '£' : m === 'EUR' ? '€' : m === 'USD' ? 'US$' : 'R$';
+};
 window.fmt = {
-  money: v => 'R$ ' + (Number(v) || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}),
-  moneyShort: v => 'R$ ' + ((Number(v)||0)/1000).toFixed(1) + 'k',
+  money: v => moedaSimbolo() + ' ' + (Number(v) || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}),
+  moneyShort: v => moedaSimbolo() + ' ' + ((Number(v)||0)/1000).toFixed(1) + 'k',
   pct: v => ((Number(v)||0)*100).toFixed(1) + '%',
   num: v => (Number(v) || 0).toLocaleString('pt-BR'),
   date: d => {
@@ -74,13 +78,39 @@ function buildLayout() {
     }
   });
 
+  // ---------- switcher de obras ----------
+  const obras = window.OBRAS || [];
+  const obraAtiva = window.OBRA || null;
+  const STATUS_LABEL = { ativa: 'em obra', cotacao: 'em cotação', planejada: 'planejada', encerrada: 'encerrada' };
+
+  const sigla = (obraAtiva && obraAtiva.cod ? obraAtiva.cod : 'B')
+    .replace(/[^A-Za-z0-9]/g, '').charAt(0).toUpperCase() || 'B';
+
+  const linhaObra = (() => {
+    if (!obraAtiva) return '2 casas · 154,84m² · Sen. Canedo';
+    const bits = [];
+    if (obraAtiva.unidades) bits.push(obraAtiva.unidades > 1 ? obraAtiva.unidades + ' casas' : '1 unidade');
+    if (obraAtiva.area_m2) bits.push(Number(obraAtiva.area_m2).toLocaleString('pt-BR') + 'm²');
+    if (obraAtiva.fase) bits.push(obraAtiva.fase);
+    else if (obraAtiva.status) bits.push(STATUS_LABEL[obraAtiva.status] || obraAtiva.status);
+    return bits.join(' · ') || obraAtiva.cod;
+  })();
+
+  const switcherHtml = obras.length > 1 ? `<div class="obra-switch">
+      <select id="obraSel" aria-label="Trocar de obra">
+        ${obras.map(o => `<option value="${o.id}"${obraAtiva && o.id === obraAtiva.id ? ' selected' : ''}>${o.nome} — ${STATUS_LABEL[o.status] || o.status}</option>`).join('')}
+      </select>
+      <span class="chev">▾</span>
+    </div>` : '';
+
   const sidebar = `<aside class="sidebar">
     <div class="sidebar-brand">
       <a href="/" class="logo">
-        <div class="logo-icon">B</div>
-        <span>BTR Paraíso II</span>
+        <div class="logo-icon">${sigla}</div>
+        <span>${obraAtiva ? obraAtiva.nome : 'BTR Paraíso II'}</span>
       </a>
-      <div class="project">2 casas · 154,84m² · Sen. Canedo</div>
+      ${switcherHtml}
+      <div class="project">${linhaObra}</div>
     </div>
     <nav class="sidebar-nav">${navHtml}</nav>
     <div class="sidebar-footer">
@@ -92,7 +122,7 @@ function buildLayout() {
   const pageTitle = navItems.find(i => i.id === currentPage)?.label || 'Dashboard';
   const topbar = `<header class="topbar">
     <div class="topbar-left">
-      <div class="breadcrumb">BTR Paraíso II · <strong>${pageTitle}</strong></div>
+      <div class="breadcrumb">${(D.obra && D.obra.cod) ? D.obra.cod : 'BTR Paraíso II'} · <strong>${pageTitle}</strong></div>
     </div>
     <div class="topbar-right">
       <div class="topbar-stat">Orçado: <strong>${fmt.money(D.kpis.orcamento_total)}</strong></div>
@@ -114,6 +144,13 @@ function buildLayout() {
       </div>
     </div>
   `);
+
+  // Trocar de obra: guarda no navegador e recarrega
+  const sel = document.getElementById('obraSel');
+  if (sel) sel.addEventListener('change', e => {
+    const id = Number(e.target.value);
+    if (window.setObra) window.setObra(id);
+  });
 
   // Move existing body content into #page-content
   const orig = document.getElementById('original-content');
@@ -173,7 +210,60 @@ function btrBootstrap() {
     return;
   }
   buildLayout();
-  if (typeof initPage === 'function') initPage();
+
+  const D = window.DATA;
+  const page = (document.body.dataset.page || '').toLowerCase();
+  const isAdmin = page.indexOf('admin') === 0;
+  const vazia = (D.etapas_nbr || []).length === 0
+             && (D.rdos || []).length === 0
+             && (D.fornecedores || []).length === 0;
+
+  // Obra recem-cadastrada, ainda sem orcamento nem RDO: nao adianta
+  // renderizar graficos de nada. Mostra o que se sabe e o que falta.
+  if (vazia && !isAdmin) {
+    const o = D.obra || {};
+    const campo = (rot, val) => val
+      ? `<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--gray-100)">
+           <span style="min-width:120px;color:var(--gray-500);font-size:13px">${rot}</span>
+           <span style="font-size:13px">${val}</span></div>` : '';
+    document.getElementById('page-content').innerHTML = `
+      <div class="page-header">
+        <div class="page-title">${o.nome || 'Obra'}</div>
+        <div class="page-subtitle">${o.fase || ''}</div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Obra ainda sem dados no sistema</div></div>
+        <p class="text-small text-muted" style="margin:0 0 14px">
+          Esta obra está cadastrada, mas ainda não tem orçamento, etapas nem RDOs carregados.
+          Enquanto isso, as telas de análise ficam vazias — é retrato fiel, não erro.
+        </p>
+        ${campo('Código', o.cod)}
+        ${campo('Endereço', o.endereco)}
+        ${campo('Tipo', o.tipo)}
+        ${campo('Unidades', o.unidades)}
+        ${campo('Área', o.area_m2 ? Number(o.area_m2).toLocaleString('pt-BR') + ' m²' : '')}
+        ${campo('Moeda', o.moeda)}
+        ${campo('Situação', o.status)}
+        ${o.observacao ? `<p class="text-small" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--gray-200);color:var(--gray-600)">${o.observacao}</p>` : ''}
+        <p class="text-small text-muted" style="margin-top:14px">
+          Para começar a controlar esta obra: cadastrar as etapas do orçamento e lançar o primeiro RDO em
+          <a href="/admin.html">Lançar / Editar</a>.
+        </p>
+      </div>`;
+    return;
+  }
+
+  try {
+    if (typeof initPage === 'function') initPage();
+  } catch (err) {
+    console.error('[btr] initPage falhou', err);
+    const c = document.getElementById('page-content');
+    if (c) c.insertAdjacentHTML('afterbegin',
+      `<div class="card" style="border-left:4px solid var(--danger)">
+         <div class="card-title">Esta tela não conseguiu montar com os dados desta obra</div>
+         <p class="text-small text-muted" style="margin:8px 0 0">${err.message}</p>
+       </div>`);
+  }
 }
 
 if (document.readyState === 'loading') {

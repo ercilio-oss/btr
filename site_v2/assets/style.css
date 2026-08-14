@@ -690,3 +690,24 @@ tbody tr:hover { background: var(--gray-50); }
   .content { padding: var(--space-4); }
   .topbar { padding: 0 var(--space-4); }
 }
+
+/* ============================================================
+   SWITCHER DE OBRAS — bloco da marca na sidebar
+   ============================================================ */
+.obra-switch{position:relative;margin:8px 0 2px}
+.obra-switch select{
+  width:100%;appearance:none;-webkit-appearance:none;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.16);
+  color:#fff;font:inherit;font-size:12.5px;font-weight:600;
+  padding:7px 26px 7px 10px;border-radius:7px;cursor:pointer;
+  text-overflow:ellipsis;white-space:nowrap;overflow:hidden;
+  transition:background .12s ease,border-color .12s ease;
+}
+.obra-switch select:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28)}
+.obra-switch select:focus{outline:none;border-color:rgba(255,255,255,.45);box-shadow:0 0 0 3px rgba(255,255,255,.10)}
+.obra-switch select option{background:#1e293b;color:#fff}
+.obra-switch .chev{
+  position:absolute;right:9px;top:50%;transform:translateY(-50%);
+  pointer-events:none;font-size:11px;color:rgba(255,255,255,.65);
+}

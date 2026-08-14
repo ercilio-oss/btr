@@ -358,6 +358,7 @@ function initPage() {
     e.preventDefault();
     const f = new FormData(e.target);
     const payload = {
+      obra_id: window.OBRA_ID,
       numero: Number(f.get('numero')),
       data: f.get('data'),
       clima_manha: f.get('clima_manha'),
@@ -396,6 +397,7 @@ function initPage() {
 
     // 2. Insere atividade no log (alimenta KPIs)
     const { error: e2 } = await sb.from('atividades').insert({
+      obra_id: window.OBRA_ID,
       rdo_numero: f.get('rdo_numero') ? Number(f.get('rdo_numero')) : null,
       data: f.get('data'),
       etapa_cod: cod,
@@ -509,6 +511,7 @@ function initPage() {
 
       // Registrar na tabela fotos
       const { error: insErr } = await sb.from('fotos').insert({
+        obra_id: window.OBRA_ID,
         rdo_numero: rdoNum,
         data: dataFoto,
         etapa_cod: etapaCod,
@@ -730,6 +733,7 @@ function initPage() {
 
     // 2) Insere em pagamentos (livro-razão) com FK
     const { error: e1 } = await sb.from('pagamentos').insert({
+      obra_id: window.OBRA_ID,
       nome: nomeFornecedor,
       data: f.get('data'),
       valor,
@@ -743,6 +747,7 @@ function initPage() {
 
     // 3) Insere atividade no log (alimenta KPIs)
     const { error: e2 } = await sb.from('atividades').insert({
+      obra_id: window.OBRA_ID,
       rdo_numero: f.get('rdo_numero') ? Number(f.get('rdo_numero')) : null,
       data: f.get('data'),
       etapa_cod: cod,

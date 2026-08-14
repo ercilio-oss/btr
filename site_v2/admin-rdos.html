@@ -373,6 +373,7 @@ window.approveDraft = async (id) => {
 
   // 1) Criar RDO real
   const { data: rdo, error: e1 } = await sb.from('rdos').insert({
+      obra_id: window.OBRA_ID,
     numero: draft.numero_sugerido || Math.floor(Math.random()*1000) + 100,
     data: draft.data,
     dia_semana: new Date(draft.data).toLocaleDateString('en-US', { weekday: 'long' }),
@@ -391,6 +392,7 @@ window.approveDraft = async (id) => {
   const ativs = draft.ia_response?.atividades || [];
   for (const a of ativs) {
     await sb.from('atividades').insert({
+      obra_id: window.OBRA_ID,
       rdo_id: rdo.id,
       rdo_numero: rdo.numero,
       data: draft.data,
@@ -436,6 +438,7 @@ window.approveDraft = async (id) => {
   // 5) Registrar fotos
   for (const path of (draft.fotos_paths || [])) {
     await sb.from('fotos').insert({
+      obra_id: window.OBRA_ID,
       rdo_id: rdo.id,
       rdo_numero: rdo.numero,
       data: draft.data,

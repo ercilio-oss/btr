@@ -103,6 +103,7 @@ function initPage() {
     const { data, error } = await window.supabase
       .from('fotos')
       .select('*')
+      .eq('obra_id', window.OBRA_ID)
       .order('created_at', { ascending: false });
     if (error) {
       document.getElementById('galCount').textContent = 'Erro: ' + error.message;
