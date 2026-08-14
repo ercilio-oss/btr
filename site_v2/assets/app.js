@@ -127,7 +127,7 @@ function buildLayout() {
     <div class="topbar-right">
       <div class="topbar-stat">Orçado: <strong>${fmt.money(D.kpis.orcamento_total)}</strong></div>
       <div class="topbar-stat">Realizado: <strong class="text-success">${fmt.money(D.kpis.realizado)}</strong></div>
-      <div class="topbar-stat">% Físico: <strong>${(D.kpis.pct_fisico*100).toFixed(1)}%</strong></div>
+      <div class="topbar-stat">% Financeiro: <strong>${(D.kpis.pct_fisico*100).toFixed(1)}%</strong></div>
       <a href="https://app.clickup.com/90121749578/v/li/901211229906" target="_blank" class="topbar-btn">🎯 ClickUp</a>
       <div class="user-chip" style="cursor:pointer;" onclick="if(confirm('Sair da conta?')) window.logoutBtr();" title="Clique para sair">
         <div class="user-avatar">${(D.user && D.user.nome ? D.user.nome[0] : (D.user && D.user.email ? D.user.email[0] : 'U')).toUpperCase()}</div>
